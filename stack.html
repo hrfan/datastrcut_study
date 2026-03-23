@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>栈可视化</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #fff; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 10px; font-size: 2rem; background: linear-gradient(90deg, #f2994a, #f2c94c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 20px; font-size: 0.9rem; }
+        .back-link { display: inline-block; margin-bottom: 15px; color: #f2c94c; text-decoration: none; }
+        
+        .control-panel { background: rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; }
+        .control-group { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.2); padding: 10px 15px; border-radius: 8px; flex-wrap: wrap; }
+        .control-group label { font-size: 0.85rem; color: #aaa; }
+        input[type="text"] { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 8px 12px; color: #fff; font-size: 0.9rem; width: 100px; }
+        input:focus { outline: none; border-color: #f2c94c; }
+        button { background: linear-gradient(135deg, #f2994a, #f2c94c); border: none; border-radius: 6px; padding: 10px 16px; color: #1a1a2e; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: all 0.3s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(242, 153, 74, 0.4); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        button.danger { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+        button.warning { background: linear-gradient(135deg, #ffd93d, #ff9f43); }
+        button.info { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        
+        .animation-panel { background: rgba(0,0,0,0.4); border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; border: 1px solid rgba(255, 217, 61, 0.4); display: none; }
+        .animation-panel h3 { color: #ffd93d; margin-bottom: 12px; }
+        .step-list { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; }
+        .step-item { background: rgba(255,255,255,0.05); padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; color: #888; border: 1px solid transparent; }
+        .step-item.active { background: rgba(0, 255, 136, 0.2); color: #00ff88; border-color: #00ff88; }
+        .step-item.done { background: rgba(0, 217, 255, 0.2); color: #00d9ff; border-color: #00d9ff; }
+        
+        .info-panel { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .info-box { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 16px; flex: 1; min-width: 120px; }
+        .info-box h3 { font-size: 0.8rem; color: #888; margin-bottom: 5px; }
+        .info-box .value { font-size: 1rem; color: #f2c94c; font-family: Consolas, monospace; }
+        
+        .main-content { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
+        @media (max-width: 900px) { .main-content { grid-template-columns: 1fr; } }
+        
+        .canvas-container { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.1); min-height: 450px; position: relative; }
+        canvas { display: block; border-radius: 8px; margin: 0 auto; }
+        
+        .log-panel { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; max-height: 450px; }
+        .log-title { font-size: 0.9rem; color: #f2c94c; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .log-list { flex: 1; overflow-y: auto; }
+        .log-item { padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; font-size: 0.85rem; background: rgba(0,0,0,0.2); border-left: 3px solid #888; }
+        .log-item.push { border-left-color: #00ff88; }
+        .log-item.pop { border-left-color: #ff6b6b; }
+        .log-item.peek { border-left-color: #4facfe; }
+        .log-item .log-op { font-weight: 600; color: #fff; }
+        .log-item .log-val { color: #f2c94c; margin-left: 8px; }
+        .log-item .log-time { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        
+        .legend { display: flex; justify-content: center; gap: 25px; margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #aaa; }
+        .legend-box { width: 24px; height: 24px; border-radius: 6px; background: linear-gradient(135deg, #f2994a, #f2c94c); }
+        .legend-box.top { border: 2px solid #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+        .legend-box.empty { background: rgba(255,255,255,0.1); border: 2px dashed rgba(255,255,255,0.3); }
+        
+        .help-section { margin-top: 20px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; }
+        .help-section h3 { color: #f2c94c; margin-bottom: 15px; }
+        .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        .help-item { background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 8px; border-left: 3px solid #f2c94c; font-size: 0.85rem; }
+        .help-item strong { color: #00ff88; }
+        
+        .scenario-section { margin-top: 20px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; }
+        .scenario-section h3 { color: #4facfe; margin-bottom: 15px; }
+        .scenario-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .scenario-btn { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.3s; text-align: left; }
+        .scenario-btn:hover { background: rgba(242, 153, 74, 0.15); border-color: rgba(242, 153, 74, 0.4); }
+        .scenario-btn strong { display: block; color: #f2c94c; margin-bottom: 6px; font-size: 0.95rem; }
+        .scenario-btn p { color: #888; font-size: 0.8rem; margin: 0; }
+        
+        .tip-note { text-align: center; padding: 12px; background: rgba(242, 153, 74, 0.1); border: 1px solid rgba(242, 153, 74, 0.3); border-radius: 8px; margin-bottom: 20px; color: #f2c94c; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回目录</a>
+        <h1>📚 栈可视化</h1>
+        <p class="subtitle">Stack - LIFO (Last In First Out) 后进先出</p>
+        
+        <div class="tip-note">💡 动画演示：入栈/出栈操作会展示元素移动过程，点击场景按钮查看典型应用</div>
+        
+        <div class="control-panel">
+            <div class="control-group">
+                <label>元素值:</label>
+                <input type="text" id="inputValue" placeholder="输入值">
+                <button onclick="push()">入栈 Push</button>
+                <button onclick="pop()" id="btnPop" class="danger">出栈 Pop</button>
+            </div>
+            <div class="control-group">
+                <button onclick="peek()" id="btnPeek" class="info">查看栈顶 Peek</button>
+                <button onclick="clearStack()" class="danger">清空</button>
+                <button onclick="loadExample()">加载示例</button>
+            </div>
+        </div>
+        
+        <div class="animation-panel" id="animationPanel">
+            <h3>🎬 操作步骤</h3>
+            <ul class="step-list" id="stepList"></ul>
+        </div>
+        
+        <div class="info-panel">
+            <div class="info-box"><h3>栈大小</h3><div class="value" id="stackSize">0 / 10</div></div>
+            <div class="info-box"><h3>栈顶元素</h3><div class="value" id="topElement">null</div></div>
+            <div class="info-box"><h3>栈状态</h3><div class="value" id="stackStatus">空栈</div></div>
+            <div class="info-box"><h3>入栈复杂度</h3><div class="value">O(1)</div></div>
+            <div class="info-box"><h3>出栈复杂度</h3><div class="value">O(1)</div></div>
+        </div>
+        
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="canvas"></canvas>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-box"></div><span>普通元素</span></div>
+                    <div class="legend-item"><div class="legend-box top"></div><span>栈顶 TOP</span></div>
+                    <div class="legend-item"><div class="legend-box empty"></div><span>空位</span></div>
+                </div>
+            </div>
+            <div class="log-panel">
+                <div class="log-title">📋 操作日志</div>
+                <div class="log-list" id="logList">
+                    <div class="log-item" style="color: #666; text-align: center; border: none; background: none;">暂无操作记录</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="scenario-section">
+            <h3>🎬 应用场景演示</h3>
+            <div class="scenario-grid">
+                <div class="scenario-btn" onclick="scenarioBracket()">
+                    <strong>括号匹配</strong>
+                    <p>检测表达式中的括号是否成对匹配</p>
+                </div>
+                <div class="scenario-btn" onclick="scenarioUndo()">
+                    <strong>撤销操作</strong>
+                    <p>模拟编辑器的撤销功能</p>
+                </div>
+                <div class="scenario-btn" onclick="scenarioBrowser()">
+                    <strong>浏览器历史</strong>
+                    <p>模拟浏览器的前进后退</p>
+                </div>
+                <div class="scenario-btn" onclick="scenarioFunction()">
+                    <strong>函数调用栈</strong>
+                    <p>模拟程序函数调用过程</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="help-section">
+            <h3>📖 帮助说明</h3>
+            <div class="help-grid">
+                <div class="help-item"><strong>入栈 Push</strong>：将元素添加到栈顶，时间复杂度 O(1)</div>
+                <div class="help-item"><strong>出栈 Pop</strong>：移除并返回栈顶元素，时间复杂度 O(1)</div>
+                <div class="help-item"><strong>查看栈顶 Peek</strong>：查看栈顶元素但不移除</div>
+                <div class="help-item"><strong>LIFO原则</strong>：最后入栈的元素最先出栈</div>
+                <div class="help-item"><strong>典型应用</strong>：函数调用、括号匹配、撤销重做</div>
+                <div class="help-item"><strong>空间复杂度</strong>：O(n)，n为栈中元素数量</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const maxSize = 10;
+        let stack = [];
+        let logs = [];
+        let animating = false;
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = Math.min(600, container.clientWidth - 40);
+            canvas.height = 420;
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const itemWidth = 120;
+            const itemHeight = 45;
+            const gap = 8;
+            const startX = (canvas.width - itemWidth) / 2;
+            const startY = 30;
+            
+            // 绘制栈框架
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(startX - 15, startY - 10, itemWidth + 30, (itemHeight + gap) * maxSize + 30);
+            ctx.setLineDash([]);
+            
+            // 标签
+            ctx.font = 'bold 12px Segoe UI';
+            ctx.fillStyle = '#f2c94c';
+            ctx.textAlign = 'right';
+            ctx.fillText('TOP →', startX - 25, startY + itemHeight / 2 + 4);
+            ctx.textAlign = 'left';
+            ctx.fillText('← BOTTOM', startX + itemWidth + 20, startY + (itemHeight + gap) * (maxSize - 1) + itemHeight / 2 + 4);
+            
+            if (stack.length === 0) {
+                ctx.font = '16px Segoe UI';
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.textAlign = 'center';
+                ctx.fillText('栈为空', canvas.width / 2, canvas.height / 2);
+                ctx.font = '12px Segoe UI';
+                ctx.fillText('输入值后点击"入栈"添加元素', canvas.width / 2, canvas.height / 2 + 25);
+                return;
+            }
+            
+            // 绘制栈元素（从底部开始）
+            for (let i = maxSize - 1; i >= 0; i--) {
+                const y = startY + (maxSize - 1 - i) * (itemHeight + gap);
+                const stackIndex = i;
+                
+                if (stackIndex < stack.length) {
+                    // 有元素
+                    const isTop = (stackIndex === stack.length - 1);
+                    const gradient = ctx.createLinearGradient(startX, y, startX + itemWidth, y);
+                    gradient.addColorStop(0, '#f2994a');
+                    gradient.addColorStop(1, '#f2c94c');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.roundRect(startX, y, itemWidth, itemHeight, 8);
+                    ctx.fill();
+                    
+                    // 栈顶高亮边框
+                    if (isTop) {
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.shadowColor = 'rgba(255,255,255,0.5)';
+                        ctx.shadowBlur = 10;
+                        ctx.stroke();
+                        ctx.shadowBlur = 0;
+                    }
+                    
+                    // 文字
+                    ctx.font = 'bold 14px Consolas';
+                    ctx.fillStyle = '#1a1a2e';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(stack[stackIndex], startX + itemWidth / 2, y + itemHeight / 2 + 5);
+                    
+                    // 索引
+                    ctx.font = '10px Segoe UI';
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('#' + stackIndex, startX - 5, y + itemHeight / 2 + 3);
+                } else {
+                    // 空位
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.strokeRect(startX, y, itemWidth, itemHeight);
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+
+        function updateInfo() {
+            document.getElementById('stackSize').textContent = `${stack.length} / ${maxSize}`;
+            document.getElementById('topElement').textContent = stack.length > 0 ? stack[stack.length - 1] : 'null';
+            document.getElementById('stackStatus').textContent = stack.length === 0 ? '空栈' : (stack.length >= maxSize ? '已满' : '正常');
+            document.getElementById('btnPop').disabled = stack.length === 0;
+            document.getElementById('btnPeek').disabled = stack.length === 0;
+        }
+
+        function addLog(op, val) {
+            const now = new Date();
+            const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            logs.unshift({ op, val, time });
+            if (logs.length > 30) logs.pop();
+            
+            const logList = document.getElementById('logList');
+            const opText = { push: '↑ 入栈', pop: '↓ 出栈', peek: '👁 查看' };
+            logList.innerHTML = logs.map(l => `
+                <div class="log-item ${l.op}">
+                    <span class="log-op">${opText[l.op]}</span>
+                    <span class="log-val">"${l.val}"</span>
+                    <div class="log-time">${l.time}</div>
+                </div>
+            `).join('');
+        }
+
+        function showSteps(steps, callback) {
+            const panel = document.getElementById('animationPanel');
+            const list = document.getElementById('stepList');
+            panel.style.display = 'block';
+            list.innerHTML = steps.map(s => `<li class="step-item">${s}</li>`).join('');
+            
+            let i = 0;
+            const interval = setInterval(() => {
+                const items = list.querySelectorAll('.step-item');
+                if (i > 0) items[i - 1].classList.add('done');
+                if (i < items.length) {
+                    items[i].classList.add('active');
+                    i++;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        panel.style.display = 'none';
+                        if (callback) callback();
+                    }, 500);
+                }
+            }, 400);
+        }
+
+        function push() {
+            if (animating) return;
+            const input = document.getElementById('inputValue');
+            let val = input.value.trim();
+            if (!val) val = `Item-${stack.length + 1}`;
+            
+            if (stack.length >= maxSize) {
+                alert('栈已满，无法继续入栈！');
+                return;
+            }
+            
+            animating = true;
+            const steps = ['检查栈是否已满', `准备入栈元素: "${val}"`, '将元素压入栈顶', '更新栈顶指针'];
+            showSteps(steps, () => {
+                stack.push(val);
+                input.value = '';
+                draw();
+                updateInfo();
+                addLog('push', val);
+                animating = false;
+            });
+        }
+
+        function pop() {
+            if (animating || stack.length === 0) return;
+            animating = true;
+            const val = stack[stack.length - 1];
+            const steps = ['检查栈是否为空', `获取栈顶元素: "${val}"`, '移除栈顶元素', '更新栈顶指针'];
+            showSteps(steps, () => {
+                stack.pop();
+                draw();
+                updateInfo();
+                addLog('pop', val);
+                animating = false;
+            });
+        }
+
+        function peek() {
+            if (stack.length === 0) return;
+            const val = stack[stack.length - 1];
+            addLog('peek', val);
+            alert(`栈顶元素: "${val}"`);
+        }
+
+        function clearStack() {
+            stack = [];
+            logs = [];
+            document.getElementById('logList').innerHTML = '<div class="log-item" style="color: #666; text-align: center; border: none; background: none;">暂无操作记录</div>';
+            draw();
+            updateInfo();
+        }
+
+        function loadExample() {
+            clearStack();
+            stack = ['HTML', 'CSS', 'JS', 'React', 'Node'];
+            stack.forEach(v => addLog('push', v));
+            draw();
+            updateInfo();
+        }
+
+        // 场景演示
+        function scenarioBracket() {
+            if (animating) return;
+            clearStack();
+            const expr = ['(', 'A', '+', 'B', ')', '*', '(', 'C', '-', 'D', ')'];
+            let i = 0;
+            animating = true;
+            
+            const interval = setInterval(() => {
+                if (i >= expr.length) {
+                    clearInterval(interval);
+                    animating = false;
+                    alert('括号匹配演示完成！所有括号已正确配对');
+                    return;
+                }
+                const c = expr[i];
+                if (c === '(') {
+                    stack.push(`括号: ${c}`);
+                    addLog('push', c);
+                } else if (c === ')') {
+                    stack.pop();
+                    addLog('pop', ')');
+                } else {
+                    stack.push(c);
+                    addLog('push', c);
+                }
+                draw();
+                updateInfo();
+                i++;
+            }, 600);
+        }
+
+        function scenarioUndo() {
+            if (animating) return;
+            clearStack();
+            const actions = ['输入: Hello', '输入: World', '输入: !'];
+            let i = 0;
+            animating = true;
+            
+            const interval = setInterval(() => {
+                if (i >= actions.length) {
+                    clearInterval(interval);
+                    // 开始撤销
+                    setTimeout(() => {
+                        const undoInterval = setInterval(() => {
+                            if (stack.length === 0) {
+                                clearInterval(undoInterval);
+                                animating = false;
+                                alert('撤销演示完成！');
+                                return;
+                            }
+                            const v = stack.pop();
+                            addLog('pop', v);
+                            draw();
+                            updateInfo();
+                        }, 800);
+                    }, 500);
+                    return;
+                }
+                stack.push(actions[i]);
+                addLog('push', actions[i]);
+                draw();
+                updateInfo();
+                i++;
+            }, 600);
+        }
+
+        function scenarioBrowser() {
+            if (animating) return;
+            clearStack();
+            const pages = ['首页', '列表页', '详情页', '购物车', '结算页'];
+            let i = 0;
+            animating = true;
+            
+            const interval = setInterval(() => {
+                if (i >= pages.length) {
+                    clearInterval(interval);
+                    alert('页面浏览完成！点击确定后模拟返回');
+                    setTimeout(() => {
+                        const backInterval = setInterval(() => {
+                            if (stack.length === 0) {
+                                clearInterval(backInterval);
+                                animating = false;
+                                alert('已返回到首页！');
+                                return;
+                            }
+                            const v = stack.pop();
+                            addLog('pop', `返回: ${v}`);
+                            draw();
+                            updateInfo();
+                        }, 700);
+                    }, 500);
+                    return;
+                }
+                stack.push(`📄 ${pages[i]}`);
+                addLog('push', pages[i]);
+                draw();
+                updateInfo();
+                i++;
+            }, 500);
+        }
+
+        function scenarioFunction() {
+            if (animating) return;
+            clearStack();
+            const calls = [
+                { fn: 'main()', dir: 'in' },
+                { fn: 'init()', dir: 'in' },
+                { fn: 'loadData()', dir: 'in' },
+                { fn: 'parse()', dir: 'in' },
+                { fn: 'parse()', dir: 'out' },
+                { fn: 'loadData()', dir: 'out' },
+                { fn: 'init()', dir: 'out' },
+                { fn: 'main()', dir: 'out' }
+            ];
+            let i = 0;
+            animating = true;
+            
+            const interval = setInterval(() => {
+                if (i >= calls.length) {
+                    clearInterval(interval);
+                    animating = false;
+                    alert('函数调用栈演示完成！');
+                    return;
+                }
+                const call = calls[i];
+                if (call.dir === 'in') {
+                    stack.push(call.fn);
+                    addLog('push', `调用: ${call.fn}`);
+                } else {
+                    const v = stack.pop();
+                    addLog('pop', `返回: ${v}`);
+                }
+                draw();
+                updateInfo();
+                i++;
+            }, 600);
+        }
+
+        // 回车键入栈
+        document.getElementById('inputValue').addEventListener('keypress', e => {
+            if (e.key === 'Enter') push();
+        });
+
+        // 初始化
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        updateInfo();
+    </script>
+</body>
+</html>

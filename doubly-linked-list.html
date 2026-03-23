@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双链表可视化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .back-link { display: inline-block; margin-bottom: 15px; color: #00d9ff; text-decoration: none; }
+        .back-link:hover { color: #00ff88; }
+        
+        /* 控制面板 */
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+        
+        .control-group label {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        
+        input[type="text"], input[type="number"] {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 0.9rem;
+            width: 80px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #00d9ff;
+            box-shadow: 0 0 10px rgba(0, 217, 255, 0.3);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            color: #1a1a2e;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.danger {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        }
+        
+        button.warning {
+            background: linear-gradient(135deg, #ffd93d, #ff9f43);
+        }
+        
+        /* 信息面板 */
+        .info-panel {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px 20px;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .info-box h3 {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        
+        .info-box .value {
+            font-size: 1.1rem;
+            color: #00d9ff;
+            font-family: 'Consolas', monospace;
+        }
+        
+        /* Canvas 容器 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        canvas {
+            display: block;
+            border-radius: 8px;
+        }
+        
+        /* 图例 */
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .legend-line {
+            width: 40px;
+            height: 3px;
+        }
+        
+        .legend-line.next {
+            background: #00ff88;
+        }
+        
+        .legend-line.prev {
+            background: #ff6b6b;
+            background: repeating-linear-gradient(
+                90deg,
+                #ff6b6b,
+                #ff6b6b 5px,
+                transparent 5px,
+                transparent 10px
+            );
+        }
+        
+        /* 操作说明 */
+        .help-section {
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .help-section h3 {
+            color: #00d9ff;
+            margin-bottom: 15px;
+        }
+        
+        .help-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .help-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 3px solid #00d9ff;
+        }
+        
+        .help-item strong {
+            color: #00ff88;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .control-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                flex-wrap: wrap;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+            <a href="index.html" class="back-link">← 返回目录</a>
+        <h1>🔗 双向链表可视化</h1>
+        <p class="subtitle">Doubly Linked List Visualization - 交互式数据结构演示</p>
+        
+        <!-- 控制面板 -->
+        <div class="control-panel">
+            <div class="control-group">
+                <label>节点值:</label>
+                <input type="text" id="nodeValue" placeholder="值">
+                <button onclick="appendNode()">添加到尾部</button>
+            </div>
+            
+            <div class="control-group">
+                <label>目标值:</label>
+                <input type="text" id="targetValue" placeholder="目标">
+                <label>新值:</label>
+                <input type="text" id="insertValue" placeholder="新值">
+                <button onclick="insertAfter()">在目标后插入</button>
+            </div>
+            
+            <div class="control-group">
+                <label>删除值:</label>
+                <input type="text" id="deleteValue" placeholder="值">
+                <button onclick="deleteNode()" class="danger">删除节点</button>
+            </div>
+            
+            <div class="control-group">
+                <button onclick="deleteTail()" class="warning">删除尾部</button>
+                <button onclick="deleteHead()" class="warning">删除头部</button>
+                <button onclick="clearList()" class="danger">清空链表</button>
+                <button onclick="loadExample()">加载示例</button>
+            </div>
+        </div>
+        
+        <!-- 信息面板 -->
+        <div class="info-panel">
+            <div class="info-box">
+                <h3>节点数量</h3>
+                <div class="value" id="nodeCount">0</div>
+            </div>
+            <div class="info-box">
+                <h3>头节点</h3>
+                <div class="value" id="headNode">null</div>
+            </div>
+            <div class="info-box">
+                <h3>尾节点</h3>
+                <div class="value" id="tailNode">null</div>
+            </div>
+            <div class="info-box">
+                <h3>链表内容</h3>
+                <div class="value" id="listContent">[]</div>
+            </div>
+        </div>
+        
+        <!-- Canvas 容器 -->
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-line next"></div>
+                    <span>next 指针 (→)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line prev"></div>
+                    <span>prev 指针 (←)</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作说明 -->
+        <div class="help-section">
+            <h3>📖 操作说明</h3>
+            <div class="help-grid">
+                <div class="help-item">
+                    <strong>添加节点:</strong> 输入值后点击"添加到尾部"，新节点将成为新的尾节点
+                </div>
+                <div class="help-item">
+                    <strong>插入节点:</strong> 输入目标值和新值，在目标节点后插入新节点
+                </div>
+                <div class="help-item">
+                    <strong>删除节点:</strong> 输入要删除的节点值，删除第一个匹配的节点
+                </div>
+                <div class="help-item">
+                    <strong>双向指针:</strong> 绿色实线表示next指针，红色虚线表示prev指针
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 双向链表数据结构 ====================
+        class Node {
+            constructor(value) {
+                this.value = value;
+                this.prev = null;
+                this.next = null;
+            }
+        }
+
+        class DoublyLinkedList {
+            constructor() {
+                this.head = null;
+                this.tail = null;
+                this.size = 0;
+            }
+
+            // 添加到尾部
+            append(value) {
+                const newNode = new Node(value);
+                if (!this.head) {
+                    this.head = newNode;
+                    this.tail = newNode;
+                } else {
+                    this.tail.next = newNode;
+                    newNode.prev = this.tail;
+                    this.tail = newNode;
+                }
+                this.size++;
+                return newNode;
+            }
+
+            // 在指定节点后插入
+            insertAfter(targetValue, newValue) {
+                let current = this.head;
+                while (current) {
+                    if (current.value == targetValue) {
+                        const newNode = new Node(newValue);
+                        newNode.prev = current;
+                        newNode.next = current.next;
+                        if (current.next) {
+                            current.next.prev = newNode;
+                        } else {
+                            this.tail = newNode;
+                        }
+                        current.next = newNode;
+                        this.size++;
+                        return true;
+                    }
+                    current = current.next;
+                }
+                return false;
+            }
+
+            // 删除指定值的节点
+            delete(value) {
+                let current = this.head;
+                while (current) {
+                    if (current.value == value) {
+                        if (current.prev) {
+                            current.prev.next = current.next;
+                        } else {
+                            this.head = current.next;
+                        }
+                        if (current.next) {
+                            current.next.prev = current.prev;
+                        } else {
+                            this.tail = current.prev;
+                        }
+                        this.size--;
+                        return true;
+                    }
+                    current = current.next;
+                }
+                return false;
+            }
+
+            // 删除头节点
+            deleteHead() {
+                if (!this.head) return false;
+                if (this.head.next) {
+                    this.head.next.prev = null;
+                    this.head = this.head.next;
+                } else {
+                    this.head = null;
+                    this.tail = null;
+                }
+                this.size--;
+                return true;
+            }
+
+            // 删除尾节点
+            deleteTail() {
+                if (!this.tail) return false;
+                if (this.tail.prev) {
+                    this.tail.prev.next = null;
+                    this.tail = this.tail.prev;
+                } else {
+                    this.head = null;
+                    this.tail = null;
+                }
+                this.size--;
+                return true;
+            }
+
+            // 清空链表
+            clear() {
+                this.head = null;
+                this.tail = null;
+                this.size = 0;
+            }
+
+            // 获取所有节点数组（用于绘制）
+            getNodes() {
+                const nodes = [];
+                let current = this.head;
+                while (current) {
+                    nodes.push({
+                        value: current.value,
+                        prevValue: current.prev ? current.prev.value : null,
+                        nextValue: current.next ? current.next.value : null
+                    });
+                    current = current.next;
+                }
+                return nodes;
+            }
+
+            // 获取内容字符串
+            toString() {
+                const values = [];
+                let current = this.head;
+                while (current) {
+                    values.push(current.value);
+                    current = current.next;
+                }
+                return '[' + values.join(' ↔ ') + ']';
+            }
+        }
+
+        // ==================== 全局变量 ====================
+        const list = new DoublyLinkedList();
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 绘图配置
+        const config = {
+            nodeWidth: 140,
+            nodeHeight: 80,
+            nodeGap: 60,
+            startX: 80,
+            startY: 150,
+            padding: 40
+        };
+
+        // ==================== 绘图函数 ====================
+        function drawArrow(fromX, fromY, toX, toY, color, dashed = false) {
+            const headLength = 12;
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2.5;
+            
+            if (dashed) {
+                ctx.setLineDash([8, 4]);
+            } else {
+                ctx.setLineDash([]);
+            }
+
+            // 缩短线条避免与节点重叠
+            const shortenStart = 10;
+            const shortenEnd = 15;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const ratio1 = shortenStart / length;
+            const ratio2 = (length - shortenEnd) / length;
+            
+            const startX = fromX + dx * ratio1;
+            const startY = fromY + dy * ratio1;
+            const endX = fromX + dx * ratio2;
+            const endY = fromY + dy * ratio2;
+
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // 绘制箭头
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - headLength * Math.cos(angle - Math.PI / 6),
+                endY - headLength * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.lineTo(
+                endX - headLength * Math.cos(angle + Math.PI / 6),
+                endY - headLength * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawNode(x, y, node, index) {
+            const { nodeWidth, nodeHeight } = config;
+
+            // 绘制节点背景
+            ctx.beginPath();
+            ctx.roundRect(x, y, nodeWidth, nodeHeight, 10);
+            
+            // 渐变填充
+            const gradient = ctx.createLinearGradient(x, y, x, y + nodeHeight);
+            gradient.addColorStop(0, '#2d3748');
+            gradient.addColorStop(1, '#1a202c');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // 边框
+            ctx.strokeStyle = '#00d9ff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 节点索引
+            ctx.fillStyle = '#888';
+            ctx.font = '12px Consolas';
+            ctx.textAlign = 'center';
+            ctx.fillText(`[${index}]`, x + nodeWidth / 2, y - 10);
+
+            // 节点值
+            ctx.fillStyle = '#00ff88';
+            ctx.font = 'bold 24px Consolas';
+            ctx.fillText(node.value, x + nodeWidth / 2, y + nodeHeight / 2 + 8);
+
+            // prev 指针信息 (左侧)
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = '11px Consolas';
+            ctx.textAlign = 'right';
+            const prevText = node.prevValue !== null ? `← ${node.prevValue}` : '← null';
+            ctx.fillText(prevText, x - 8, y + nodeHeight / 2 - 5);
+
+            // next 指针信息 (右侧)
+            ctx.fillStyle = '#00ff88';
+            ctx.textAlign = 'left';
+            const nextText = node.nextValue !== null ? `${node.nextValue} →` : 'null →';
+            ctx.fillText(nextText, x + nodeWidth + 8, y + nodeHeight / 2 - 5);
+
+            // 节点类型标识
+            let typeText = '';
+            if (node.prevValue === null && node.nextValue === null) {
+                typeText = '(head & tail)';
+            } else if (node.prevValue === null) {
+                typeText = '(head)';
+            } else if (node.nextValue === null) {
+                typeText = '(tail)';
+            }
+            
+            if (typeText) {
+                ctx.fillStyle = '#ffd93d';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(typeText, x + nodeWidth / 2, y + nodeHeight + 15);
+            }
+        }
+
+        function draw() {
+            const nodes = list.getNodes();
+            const { nodeWidth, nodeHeight, nodeGap, startX, startY, padding } = config;
+
+            // 计算canvas尺寸
+            const minWidth = 800;
+            const calculatedWidth = Math.max(
+                minWidth,
+                nodes.length * (nodeWidth + nodeGap) + startX + padding
+            );
+            
+            canvas.width = calculatedWidth;
+            canvas.height = 320;
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制背景网格
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // 空链表提示
+            if (nodes.length === 0) {
+                ctx.fillStyle = '#666';
+                ctx.font = '18px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('链表为空，请添加节点', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            // 计算节点位置
+            const positions = nodes.map((node, index) => ({
+                x: startX + index * (nodeWidth + nodeGap),
+                y: startY
+            }));
+
+            // 绘制 next 连线 (绿色实线，从左到右)
+            ctx.strokeStyle = '#00ff88';
+            for (let i = 0; i < nodes.length - 1; i++) {
+                const from = positions[i];
+                const to = positions[i + 1];
+                drawArrow(
+                    from.x + nodeWidth, from.y + nodeHeight / 2,
+                    to.x, to.y + nodeHeight / 2,
+                    '#00ff88',
+                    false
+                );
+            }
+
+            // 绘制 prev 连线 (红色虚线，从右到左)
+            for (let i = 1; i < nodes.length; i++) {
+                const from = positions[i];
+                const to = positions[i - 1];
+                // 使用弧线避免与next线完全重叠
+                const midY = from.y + nodeHeight / 2 + 40;
+                ctx.beginPath();
+                ctx.strokeStyle = '#ff6b6b';
+                ctx.setLineDash([6, 4]);
+                ctx.lineWidth = 2;
+                ctx.moveTo(from.x, from.y + nodeHeight / 2 + 10);
+                ctx.quadraticCurveTo(
+                    (from.x + to.x + nodeWidth) / 2, midY + 30,
+                    to.x + nodeWidth, to.y + nodeHeight / 2 + 10
+                );
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 绘制箭头
+                const arrowX = to.x + nodeWidth;
+                const arrowY = to.y + nodeHeight / 2 + 10;
+                ctx.beginPath();
+                ctx.fillStyle = '#ff6b6b';
+                ctx.moveTo(arrowX + 5, arrowY);
+                ctx.lineTo(arrowX - 5, arrowY - 6);
+                ctx.lineTo(arrowX - 5, arrowY + 6);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 绘制节点
+            nodes.forEach((node, index) => {
+                drawNode(positions[index].x, positions[index].y, node, index);
+            });
+        }
+
+        // ==================== 操作函数 ====================
+        function appendNode() {
+            const value = document.getElementById('nodeValue').value.trim();
+            if (value === '') {
+                alert('请输入节点值');
+                return;
+            }
+            list.append(value);
+            document.getElementById('nodeValue').value = '';
+            updateInfo();
+            draw();
+        }
+
+        function insertAfter() {
+            const target = document.getElementById('targetValue').value.trim();
+            const value = document.getElementById('insertValue').value.trim();
+            if (target === '' || value === '') {
+                alert('请输入目标值和新值');
+                return;
+            }
+            if (list.insertAfter(target, value)) {
+                document.getElementById('targetValue').value = '';
+                document.getElementById('insertValue').value = '';
+                updateInfo();
+                draw();
+            } else {
+                alert(`未找到值为 "${target}" 的节点`);
+            }
+        }
+
+        function deleteNode() {
+            const value = document.getElementById('deleteValue').value.trim();
+            if (value === '') {
+                alert('请输入要删除的节点值');
+                return;
+            }
+            if (list.delete(value)) {
+                document.getElementById('deleteValue').value = '';
+                updateInfo();
+                draw();
+            } else {
+                alert(`未找到值为 "${value}" 的节点`);
+            }
+        }
+
+        function deleteHead() {
+            if (list.deleteHead()) {
+                updateInfo();
+                draw();
+            } else {
+                alert('链表为空');
+            }
+        }
+
+        function deleteTail() {
+            if (list.deleteTail()) {
+                updateInfo();
+                draw();
+            } else {
+                alert('链表为空');
+            }
+        }
+
+        function clearList() {
+            if (list.size === 0) return;
+            if (confirm('确定要清空链表吗？')) {
+                list.clear();
+                updateInfo();
+                draw();
+            }
+        }
+
+        function loadExample() {
+            list.clear();
+            ['A', 'B', 'C', 'D', 'E'].forEach(v => list.append(v));
+            updateInfo();
+            draw();
+        }
+
+        function updateInfo() {
+            document.getElementById('nodeCount').textContent = list.size;
+            document.getElementById('headNode').textContent = list.head ? list.head.value : 'null';
+            document.getElementById('tailNode').textContent = list.tail ? list.tail.value : 'null';
+            document.getElementById('listContent').textContent = list.toString();
+        }
+
+        // ==================== 初始化 ====================
+        // 回车键支持
+        document.getElementById('nodeValue').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') appendNode();
+        });
+
+        // 初始绘制
+        loadExample();
+    </script>
+</body>
+</html>

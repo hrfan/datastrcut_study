@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双向循环链表可视化</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { text-align: center; color: #888; margin-bottom: 20px; font-size: 0.9rem; }
+        .back-link { display: inline-block; margin-bottom: 15px; color: #00d9ff; text-decoration: none; }
+        
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 15px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        .control-group label { font-size: 0.85rem; color: #aaa; }
+        input[type="text"] {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 0.9rem;
+            width: 70px;
+        }
+        input:focus { outline: none; border-color: #00d9ff; }
+        button {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border: none;
+            border-radius: 6px;
+            padding: 10px 16px;
+            color: #1a1a2e;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        button.danger { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+        button.warning { background: linear-gradient(135deg, #ffd93d, #ff9f43); }
+        
+        .animation-panel {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 217, 61, 0.4);
+        }
+        .animation-panel h3 { color: #ffd93d; margin-bottom: 12px; }
+        .step-list { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; }
+        .step-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #888;
+            border: 1px solid transparent;
+        }
+        .step-item.active { background: rgba(0, 255, 136, 0.2); color: #00ff88; border-color: #00ff88; }
+        .step-item.done { background: rgba(0, 217, 255, 0.2); color: #00d9ff; border-color: #00d9ff; }
+        
+        .info-panel { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px 16px;
+            flex: 1;
+            min-width: 120px;
+        }
+        .info-box h3 { font-size: 0.8rem; color: #888; margin-bottom: 5px; }
+        .info-box .value { font-size: 1rem; color: #00d9ff; font-family: Consolas, monospace; }
+        
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        canvas { display: block; border-radius: 8px; margin: 0 auto; }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+        .legend-line { width: 35px; height: 3px; }
+        .legend-line.next { background: #00ff88; }
+        .legend-line.prev { background: repeating-linear-gradient(90deg, #ff6b6b, #ff6b6b 5px, transparent 5px, transparent 10px); }
+        .legend-line.highlight { background: #ffd93d; box-shadow: 0 0 8px #ffd93d; }
+        .legend-node { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #ffd93d; background: rgba(255, 217, 61, 0.3); }
+        
+        .help-section { margin-top: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 20px; }
+        .help-section h3 { color: #00d9ff; margin-bottom: 15px; }
+        .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        .help-item { background: rgba(0, 0, 0, 0.2); padding: 10px 14px; border-radius: 8px; border-left: 3px solid #00d9ff; font-size: 0.85rem; }
+        .help-item strong { color: #00ff88; }
+        
+        .circular-note {
+            text-align: center;
+            padding: 12px;
+            background: rgba(255, 217, 61, 0.1);
+            border: 1px solid rgba(255, 217, 61, 0.3);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #ffd93d;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回目录</a>
+        <h1>🔄 双向循环链表可视化</h1>
+        <p class="subtitle">Doubly Circular Linked List - 带动画的指针操作演示</p>
+        
+        <div class="circular-note">💡 动画演示：插入/删除操作会逐步展示指针断开与重连的过程</div>
+        
+        <div class="control-panel">
+            <div class="control-group">
+                <label>值:</label>
+                <input type="text" id="nodeValue" placeholder="值">
+                <button onclick="appendNode()">添尾部</button>
+                <button onclick="prependNode()">添头部</button>
+            </div>
+            <div class="control-group">
+                <label>目标:</label>
+                <input type="text" id="targetValue" placeholder="目标">
+                <label>新:</label>
+                <input type="text" id="insertValue" placeholder="新值">
+                <button onclick="insertAfterNode()">后插</button>
+                <button onclick="insertBeforeNode()">前插</button>
+            </div>
+            <div class="control-group">
+                <label>删:</label>
+                <input type="text" id="deleteValue" placeholder="值">
+                <button onclick="deleteNode()" class="danger">删除</button>
+                <button onclick="deleteHeadBtn()" class="warning">删头</button>
+                <button onclick="deleteTailBtn()" class="warning">删尾</button>
+                <button onclick="clearList()" class="danger">清空</button>
+                <button onclick="loadExample()">示例</button>
+            </div>
+        </div>
+        
+        <div class="animation-panel" id="animationPanel" style="display: none;">
+            <h3>🎬 操作步骤</h3>
+            <ul class="step-list" id="stepList"></ul>
+        </div>
+        
+        <div class="info-panel">
+            <div class="info-box"><h3>节点数</h3><div class="value" id="nodeCount">0</div></div>
+            <div class="info-box"><h3>头节点</h3><div class="value" id="headNode">null</div></div>
+            <div class="info-box"><h3>尾节点</h3><div class="value" id="tailNode">null</div></div>
+            <div class="info-box"><h3>链表内容</h3><div class="value" id="listContent">[]</div></div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-line next"></div><span>next (→)</span></div>
+                <div class="legend-item"><div class="legend-line prev"></div><span>prev (←)</span></div>
+                <div class="legend-item"><div class="legend-line highlight"></div><span>修改中</span></div>
+                <div class="legend-item"><div class="legend-node"></div><span>头/尾</span></div>
+            </div>
+        </div>
+        
+        <div class="help-section">
+            <h3>📖 说明</h3>
+            <div class="help-grid">
+                <div class="help-item"><strong>插入动画:</strong> 展示断开→建立连接</div>
+                <div class="help-item"><strong>删除动画:</strong> 展示断开→重连邻居</div>
+                <div class="help-item"><strong>黄色:</strong> 正在修改的指针/节点</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 数据结构 ====================
+        class ListNode {
+            constructor(value) {
+                this.value = value;
+                this.prev = null;
+                this.next = null;
+            }
+        }
+
+        class DoublyCircularLinkedList {
+            constructor() {
+                this.head = null;
+                this.size = 0;
+            }
+            get tail() { return this.head ? this.head.prev : null; }
+
+            prepend(value) {
+                const newNode = new ListNode(value);
+                if (!this.head) {
+                    newNode.prev = newNode;
+                    newNode.next = newNode;
+                    this.head = newNode;
+                } else {
+                    const tail = this.head.prev;
+                    newNode.next = this.head;
+                    newNode.prev = tail;
+                    this.head.prev = newNode;
+                    tail.next = newNode;
+                    this.head = newNode;
+                }
+                this.size++;
+                return newNode;
+            }
+
+            append(value) {
+                const newNode = new ListNode(value);
+                if (!this.head) {
+                    newNode.prev = newNode;
+                    newNode.next = newNode;
+                    this.head = newNode;
+                } else {
+                    const tail = this.head.prev;
+                    newNode.next = this.head;
+                    newNode.prev = tail;
+                    tail.next = newNode;
+                    this.head.prev = newNode;
+                }
+                this.size++;
+                return newNode;
+            }
+
+            findNode(value) {
+                if (!this.head) return null;
+                let current = this.head;
+                do {
+                    if (current.value == value) return current;
+                    current = current.next;
+                } while (current !== this.head);
+                return null;
+            }
+
+            insertAfter(targetValue, newValue) {
+                const target = this.findNode(targetValue);
+                if (!target) return false;
+                const newNode = new ListNode(newValue);
+                newNode.prev = target;
+                newNode.next = target.next;
+                target.next.prev = newNode;
+                target.next = newNode;
+                this.size++;
+                return true;
+            }
+
+            insertBefore(targetValue, newValue) {
+                const target = this.findNode(targetValue);
+                if (!target) return false;
+                const newNode = new ListNode(newValue);
+                newNode.next = target;
+                newNode.prev = target.prev;
+                target.prev.next = newNode;
+                target.prev = newNode;
+                if (target === this.head) this.head = newNode;
+                this.size++;
+                return true;
+            }
+
+            delete(value) {
+                if (!this.head) return false;
+                let current = this.head;
+                do {
+                    if (current.value == value) {
+                        if (this.size === 1) {
+                            this.head = null;
+                        } else {
+                            current.prev.next = current.next;
+                            current.next.prev = current.prev;
+                            if (current === this.head) this.head = current.next;
+                        }
+                        this.size--;
+                        return true;
+                    }
+                    current = current.next;
+                } while (current !== this.head);
+                return false;
+            }
+
+            deleteHead() {
+                if (!this.head) return false;
+                if (this.size === 1) {
+                    this.head = null;
+                } else {
+                    const tail = this.head.prev;
+                    this.head = this.head.next;
+                    this.head.prev = tail;
+                    tail.next = this.head;
+                }
+                this.size--;
+                return true;
+            }
+
+            deleteTail() {
+                if (!this.head) return false;
+                if (this.size === 1) {
+                    this.head = null;
+                } else {
+                    const tail = this.head.prev;
+                    tail.prev.next = this.head;
+                    this.head.prev = tail.prev;
+                }
+                this.size--;
+                return true;
+            }
+
+            clear() { this.head = null; this.size = 0; }
+
+            getNodes() {
+                const nodes = [];
+                if (!this.head) return nodes;
+                let current = this.head;
+                do {
+                    nodes.push({
+                        value: current.value,
+                        prevValue: current.prev.value,
+                        nextValue: current.next.value,
+                        isHead: current === this.head,
+                        isTail: current === this.head.prev
+                    });
+                    current = current.next;
+                } while (current !== this.head);
+                return nodes;
+            }
+
+            toString() {
+                if (!this.head) return '[]';
+                const values = [];
+                let current = this.head;
+                do { values.push(current.value); current = current.next; } while (current !== this.head);
+                return '[' + values.join(' ↔ ') + ']';
+            }
+        }
+
+        // ==================== 全局变量 ====================
+        const list = new DoublyCircularLinkedList();
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let anim = {
+            running: false,
+            highlightNodes: [],
+            highlightArrows: [],
+            tempNode: null,
+            fadeNode: null
+        };
+
+        const cfg = { nodeW: 130, nodeH: 70, gap: 50, startX: 70, startY: 140 };
+
+        // ==================== 动画系统 ====================
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        function showSteps(steps) {
+            const panel = document.getElementById('animationPanel');
+            const listEl = document.getElementById('stepList');
+            listEl.innerHTML = steps.map((s, i) => `<li class="step-item" id="step${i}">${s}</li>`).join('');
+            panel.style.display = 'block';
+        }
+
+        function updateStep(i, total) {
+            for (let j = 0; j < total; j++) {
+                const el = document.getElementById('step' + j);
+                if (el) {
+                    el.classList.remove('active', 'done');
+                    if (j < i) el.classList.add('done');
+                    else if (j === i) el.classList.add('active');
+                }
+            }
+        }
+
+        function setButtonsDisabled(disabled) {
+            document.querySelectorAll('button').forEach(b => b.disabled = disabled);
+        }
+
+        async function runAnimation(steps, configs) {
+            if (anim.running) return;
+            anim.running = true;
+            setButtonsDisabled(true);
+            showSteps(steps);
+
+            for (let i = 0; i < configs.length; i++) {
+                updateStep(i, steps.length);
+                const c = configs[i];
+                anim.highlightNodes = c.highlightNodes || [];
+                anim.highlightArrows = c.highlightArrows || [];
+                anim.tempNode = c.tempNode || null;
+                anim.fadeNode = c.fadeNode || null;
+                if (c.action) c.action();
+                draw();
+                await sleep(1000);
+            }
+
+            anim = { running: false, highlightNodes: [], highlightArrows: [], tempNode: null, fadeNode: null };
+            updateStep(steps.length, steps.length);
+            draw();
+            updateInfo();
+            setTimeout(() => document.getElementById('animationPanel').style.display = 'none', 800);
+            setButtonsDisabled(false);
+        }
+
+        // ==================== 绘图 ====================
+        function drawArrow(x1, y1, x2, y2, color, dashed, highlight) {
+            const headLen = 10;
+            const dx = x2 - x1, dy = y2 - y1;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return;
+            const angle = Math.atan2(dy, dx);
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = highlight ? 3 : 2;
+            ctx.setLineDash(dashed ? [6, 4] : []);
+            if (highlight) { ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 12; }
+
+            const s1 = 12 / len, s2 = (len - 15) / len;
+            ctx.beginPath();
+            ctx.moveTo(x1 + dx * s1, y1 + dy * s1);
+            ctx.lineTo(x1 + dx * s2, y1 + dy * s2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(x1 + dx * s2, y1 + dy * s2);
+            ctx.lineTo(x1 + dx * s2 - headLen * Math.cos(angle - 0.4), y1 + dy * s2 - headLen * Math.sin(angle - 0.4));
+            ctx.lineTo(x1 + dx * s2 - headLen * Math.cos(angle + 0.4), y1 + dy * s2 - headLen * Math.sin(angle + 0.4));
+            ctx.fill();
+        }
+
+        function drawNode(x, y, node, idx, opts) {
+            const { nodeW, nodeH } = cfg;
+            ctx.globalAlpha = opts.fade ? 0.3 : 1;
+
+            ctx.beginPath();
+            ctx.roundRect(x, y, nodeW, nodeH, 8);
+            const grad = ctx.createLinearGradient(x, y, x, y + nodeH);
+            if (opts.highlight || opts.temp) {
+                grad.addColorStop(0, '#4a3d1a'); grad.addColorStop(1, '#2e2410');
+            } else if (node.isHead) {
+                grad.addColorStop(0, '#1a4a1a'); grad.addColorStop(1, '#0e2e0e');
+            } else if (node.isTail) {
+                grad.addColorStop(0, '#4a3a1a'); grad.addColorStop(1, '#2e220e');
+            } else {
+                grad.addColorStop(0, '#2a3444'); grad.addColorStop(1, '#1a2028');
+            }
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            ctx.strokeStyle = opts.highlight || opts.temp ? '#ffd93d' : (node.isHead || node.isTail ? '#ffd93d' : '#00d9ff');
+            ctx.lineWidth = opts.highlight || opts.temp ? 3 : 2;
+            if (opts.highlight || opts.temp) { ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 12; }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#666';
+            ctx.font = '11px Consolas';
+            ctx.textAlign = 'center';
+            ctx.fillText(`[${idx}]`, x + nodeW / 2, y - 8);
+
+            ctx.fillStyle = opts.highlight ? '#ffd93d' : '#00ff88';
+            ctx.font = 'bold 20px Consolas';
+            ctx.fillText(node.value, x + nodeW / 2, y + nodeH / 2 + 6);
+
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = '10px Consolas';
+            ctx.textAlign = 'right';
+            ctx.fillText(`←${node.prevValue}`, x - 5, y + nodeH / 2 - 3);
+
+            ctx.fillStyle = '#00ff88';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${node.nextValue}→`, x + nodeW + 5, y + nodeH / 2 - 3);
+
+            let type = node.isHead && node.isTail ? '(head&tail)' : (node.isHead ? '(head)' : (node.isTail ? '(tail)' : ''));
+            if (type) {
+                ctx.fillStyle = '#ffd93d';
+                ctx.font = '9px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(type, x + nodeW / 2, y + nodeH + 12);
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        function draw() {
+            const nodes = list.getNodes();
+            const { nodeW, nodeH, gap, startX, startY } = cfg;
+            const total = nodes.length + (anim.tempNode ? 1 : 0);
+            const w = Math.max(750, total * (nodeW + gap) + startX + 40);
+            canvas.width = w;
+            canvas.height = 380;
+
+            ctx.fillStyle = 'rgba(20,25,35,1)';
+            ctx.fillRect(0, 0, w, canvas.height);
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            for (let i = 0; i < w; i += 25) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            for (let i = 0; i < canvas.height; i += 25) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke(); }
+
+            if (total === 0) {
+                ctx.fillStyle = '#555';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('链表为空', w / 2, canvas.height / 2);
+                return;
+            }
+
+            const all = [...nodes];
+            if (anim.tempNode) all.push({ ...anim.tempNode, isHead: false, isTail: false });
+            const pos = all.map((n, i) => ({ x: startX + i * (nodeW + gap), y: startY, val: n.value }));
+
+            // Draw next arrows
+            for (let i = 0; i < all.length; i++) {
+                const from = pos[i], to = pos[(i + 1) % all.length];
+                const key = `next-${from.val}-${to.val}`;
+                const hl = anim.highlightArrows.includes(key) || anim.highlightArrows.includes(`next-${from.val}`);
+
+                if (all.length === 1) {
+                    ctx.strokeStyle = hl ? '#ffd93d' : '#00ff88';
+                    ctx.lineWidth = hl ? 3 : 2;
+                    if (hl) { ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 10; }
+                    ctx.beginPath();
+                    ctx.arc(from.x + nodeW / 2, from.y + nodeH / 2, 55, 0.3, Math.PI * 2 - 0.3);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = hl ? '#ffd93d' : '#00ff88';
+                    ctx.beginPath();
+                    const ax = from.x + nodeW / 2 + 55 * Math.cos(-0.3);
+                    const ay = from.y + nodeH / 2 + 55 * Math.sin(-0.3);
+                    ctx.moveTo(ax + 8, ay);
+                    ctx.lineTo(ax - 4, ay - 6);
+                    ctx.lineTo(ax - 4, ay + 6);
+                    ctx.fill();
+                } else if (i === all.length - 1) {
+                    ctx.strokeStyle = hl ? '#ffd93d' : '#00ff88';
+                    ctx.lineWidth = hl ? 3 : 2;
+                    if (hl) { ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 10; }
+                    const ay = from.y + nodeH + 50;
+                    ctx.beginPath();
+                    ctx.moveTo(from.x + nodeW / 2, from.y + nodeH);
+                    ctx.bezierCurveTo(from.x + nodeW / 2 + 40, ay, to.x + nodeW / 2 - 40, ay, to.x + nodeW / 2, to.y + nodeH / 2 + 35);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = hl ? '#ffd93d' : '#00ff88';
+                    ctx.beginPath();
+                    ctx.moveTo(to.x + nodeW / 2, to.y + nodeH / 2 + 35);
+                    ctx.lineTo(to.x + nodeW / 2 - 6, to.y + nodeH / 2 + 28);
+                    ctx.lineTo(to.x + nodeW / 2 + 6, to.y + nodeH / 2 + 28);
+                    ctx.fill();
+                    ctx.fillStyle = hl ? '#ffd93d' : '#00ff88';
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('循环 ↺', w / 2, ay + 18);
+                } else {
+                    drawArrow(from.x + nodeW, from.y + nodeH / 2, to.x, to.y + nodeH / 2, hl ? '#ffd93d' : '#00ff88', false, hl);
+                }
+            }
+
+            // Draw prev arrows
+            for (let i = 0; i < all.length; i++) {
+                const from = pos[i], to = pos[(i - 1 + all.length) % all.length];
+                const key = `prev-${from.val}-${to.val}`;
+                const hl = anim.highlightArrows.includes(key) || anim.highlightArrows.includes(`prev-${from.val}`);
+
+                if (all.length > 1 && i === 0) {
+                    ctx.strokeStyle = hl ? '#ffd93d' : '#ff6b6b';
+                    ctx.setLineDash([5, 3]);
+                    ctx.lineWidth = hl ? 3 : 2;
+                    if (hl) { ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 10; }
+                    const ay = from.y - 40;
+                    ctx.beginPath();
+                    ctx.moveTo(from.x + nodeW / 2, from.y);
+                    ctx.bezierCurveTo(from.x + nodeW / 2 + 40, ay, to.x + nodeW / 2 - 40, ay, to.x + nodeW / 2, to.y + nodeH / 2 - 35);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = hl ? '#ffd93d' : '#ff6b6b';
+                    ctx.beginPath();
+                    ctx.moveTo(to.x + nodeW / 2, to.y + nodeH / 2 - 35);
+                    ctx.lineTo(to.x + nodeW / 2 - 6, to.y + nodeH / 2 - 28);
+                    ctx.lineTo(to.x + nodeW / 2 + 6, to.y + nodeH / 2 - 28);
+                    ctx.fill();
+                    ctx.fillStyle = hl ? '#ffd93d' : '#ff6b6b';
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('循环 ↻', w / 2, ay - 12);
+                } else if (all.length > 1 && i > 0) {
+                    const my = from.y + nodeH / 2 + 30;
+                    ctx.strokeStyle = hl ? '#ffd93d' : '#ff6b6b';
+                    ctx.setLineDash([5, 3]);
+                    ctx.lineWidth = hl ? 3 : 2;
+                    if (hl) { ctx.shadowColor = '#ffd93d'; ctx.shadowBlur = 10; }
+                    ctx.beginPath();
+                    ctx.moveTo(from.x, from.y + nodeH / 2 + 8);
+                    ctx.quadraticCurveTo((from.x + to.x + nodeW) / 2, my + 20, to.x + nodeW, to.y + nodeH / 2 + 8);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = hl ? '#ffd93d' : '#ff6b6b';
+                    ctx.beginPath();
+                    ctx.moveTo(to.x + nodeW + 5, to.y + nodeH / 2 + 8);
+                    ctx.lineTo(to.x + nodeW - 3, to.y + nodeH / 2 + 3);
+                    ctx.lineTo(to.x + nodeW - 3, to.y + nodeH / 2 + 13);
+                    ctx.fill();
+                }
+            }
+
+            // Draw nodes
+            all.forEach((node, i) => {
+                const isTemp = anim.tempNode && node.value === anim.tempNode.value;
+                const isFade = anim.fadeNode && node.value === anim.fadeNode.value;
+                const isHl = anim.highlightNodes.includes(node.value);
+                drawNode(pos[i].x, pos[i].y, node, i, { highlight: isHl, temp: isTemp, fade: isFade });
+            });
+        }
+
+        function updateInfo() {
+            document.getElementById('nodeCount').textContent = list.size;
+            document.getElementById('headNode').textContent = list.head ? list.head.value : 'null';
+            document.getElementById('tailNode').textContent = list.tail ? list.tail.value : 'null';
+            document.getElementById('listContent').textContent = list.toString();
+        }
+
+        // ==================== 操作函数 ====================
+        function appendNode() {
+            const v = document.getElementById('nodeValue').value.trim();
+            if (!v) { alert('请输入值'); return; }
+            document.getElementById('nodeValue').value = '';
+
+            if (list.size === 0) {
+                list.append(v);
+                updateInfo();
+                draw();
+                return;
+            }
+
+            const tailVal = list.tail.value;
+            const headVal = list.head.value;
+            runAnimation([
+                `① 创建新节点 "${v}"`,
+                `② 新节点.prev = tail(${tailVal})`,
+                `③ 新节点.next = head(${headVal})`,
+                `④ tail.next = 新节点`,
+                `⑤ head.prev = 新节点`
+            ], [
+                { tempNode: { value: v, prevValue: '?', nextValue: '?' } },
+                { tempNode: { value: v, prevValue: tailVal, nextValue: headVal }, highlightNodes: [v, tailVal], highlightArrows: [`prev-${v}`] },
+                { tempNode: { value: v, prevValue: tailVal, nextValue: headVal }, highlightNodes: [v, headVal], highlightArrows: [`next-${v}`] },
+                { highlightNodes: [tailVal, v], highlightArrows: [`next-${tailVal}`] },
+                { action: function() { list.append(v); }, highlightNodes: [headVal, v], highlightArrows: [`prev-${headVal}`] }
+            ]);
+        }
+
+        function prependNode() {
+            const v = document.getElementById('nodeValue').value.trim();
+            if (!v) { alert('请输入值'); return; }
+            document.getElementById('nodeValue').value = '';
+
+            if (list.size === 0) {
+                list.prepend(v);
+                updateInfo();
+                draw();
+                return;
+            }
+
+            const tailVal = list.tail.value;
+            const headVal = list.head.value;
+            runAnimation([
+                `① 创建新节点 "${v}"`,
+                `② 新节点.next = head(${headVal})`,
+                `③ 新节点.prev = tail(${tailVal})`,
+                `④ head.prev = 新节点`,
+                `⑤ tail.next = 新节点, head = 新节点`
+            ], [
+                { tempNode: { value: v, prevValue: '?', nextValue: '?' } },
+                { tempNode: { value: v, prevValue: tailVal, nextValue: headVal }, highlightNodes: [v, headVal], highlightArrows: [`next-${v}`] },
+                { tempNode: { value: v, prevValue: tailVal, nextValue: headVal }, highlightNodes: [v, tailVal], highlightArrows: [`prev-${v}`] },
+                { highlightNodes: [headVal, v], highlightArrows: [`prev-${headVal}`] },
+                { action: function() { list.prepend(v); }, highlightNodes: [tailVal, v], highlightArrows: [`next-${tailVal}`] }
+            ]);
+        }
+
+        function insertAfterNode() {
+            const target = document.getElementById('targetValue').value.trim();
+            const v = document.getElementById('insertValue').value.trim();
+            if (!target || !v) { alert('请输入目标和值'); return; }
+            
+            const targetNode = list.findNode(target);
+            if (!targetNode) { alert(`未找到 "${target}"`); return; }
+            document.getElementById('targetValue').value = '';
+            document.getElementById('insertValue').value = '';
+
+            const nextVal = targetNode.next.value;
+            runAnimation([
+                `① 创建新节点 "${v}"`,
+                `② 新节点.prev = ${target}`,
+                `③ 新节点.next = ${nextVal}`,
+                `④ ${nextVal}.prev = 新节点`,
+                `⑤ ${target}.next = 新节点`
+            ], [
+                { tempNode: { value: v, prevValue: '?', nextValue: '?' } },
+                { tempNode: { value: v, prevValue: target, nextValue: nextVal }, highlightNodes: [v, target], highlightArrows: [`prev-${v}`] },
+                { tempNode: { value: v, prevValue: target, nextValue: nextVal }, highlightNodes: [v, nextVal], highlightArrows: [`next-${v}`] },
+                { highlightNodes: [nextVal, v], highlightArrows: [`prev-${nextVal}`] },
+                { action: function() { list.insertAfter(target, v); }, highlightNodes: [target, v], highlightArrows: [`next-${target}`] }
+            ]);
+        }
+
+        function insertBeforeNode() {
+            const target = document.getElementById('targetValue').value.trim();
+            const v = document.getElementById('insertValue').value.trim();
+            if (!target || !v) { alert('请输入目标和值'); return; }
+            
+            const targetNode = list.findNode(target);
+            if (!targetNode) { alert(`未找到 "${target}"`); return; }
+            document.getElementById('targetValue').value = '';
+            document.getElementById('insertValue').value = '';
+
+            const prevVal = targetNode.prev.value;
+            runAnimation([
+                `① 创建新节点 "${v}"`,
+                `② 新节点.next = ${target}`,
+                `③ 新节点.prev = ${prevVal}`,
+                `④ ${prevVal}.next = 新节点`,
+                `⑤ ${target}.prev = 新节点`
+            ], [
+                { tempNode: { value: v, prevValue: '?', nextValue: '?' } },
+                { tempNode: { value: v, prevValue: prevVal, nextValue: target }, highlightNodes: [v, target], highlightArrows: [`next-${v}`] },
+                { tempNode: { value: v, prevValue: prevVal, nextValue: target }, highlightNodes: [v, prevVal], highlightArrows: [`prev-${v}`] },
+                { highlightNodes: [prevVal, v], highlightArrows: [`next-${prevVal}`] },
+                { action: function() { list.insertBefore(target, v); }, highlightNodes: [target, v], highlightArrows: [`prev-${target}`] }
+            ]);
+        }
+
+        function deleteNode() {
+            const v = document.getElementById('deleteValue').value.trim();
+            if (!v) { alert('请输入值'); return; }
+            
+            const node = list.findNode(v);
+            if (!node) { alert(`未找到 "${v}"`); return; }
+            document.getElementById('deleteValue').value = '';
+
+            if (list.size === 1) {
+                list.delete(v);
+                updateInfo();
+                draw();
+                return;
+            }
+
+            const prevVal = node.prev.value;
+            const nextVal = node.next.value;
+            runAnimation([
+                `① 定位节点 "${v}"`,
+                `② ${prevVal}.next = ${nextVal}`,
+                `③ ${nextVal}.prev = ${prevVal}`,
+                `④ 移除节点 "${v}"`
+            ], [
+                { highlightNodes: [v] },
+                { highlightNodes: [prevVal, nextVal, v], highlightArrows: [`next-${prevVal}`], fadeNode: v },
+                { highlightNodes: [nextVal, prevVal, v], highlightArrows: [`prev-${nextVal}`], fadeNode: v },
+                { action: function() { list.delete(v); }, fadeNode: v }
+            ]);
+        }
+
+        function deleteHeadBtn() {
+            if (!list.head) { alert('链表为空'); return; }
+
+            if (list.size === 1) {
+                list.deleteHead();
+                updateInfo();
+                draw();
+                return;
+            }
+
+            const headVal = list.head.value;
+            const tailVal = list.tail.value;
+            const newHeadVal = list.head.next.value;
+            runAnimation([
+                `① 定位头节点 "${headVal}"`,
+                `② tail.next = newHead(${newHeadVal})`,
+                `③ newHead.prev = tail`,
+                `④ head = newHead`
+            ], [
+                { highlightNodes: [headVal] },
+                { highlightNodes: [tailVal, newHeadVal, headVal], highlightArrows: [`next-${tailVal}`], fadeNode: headVal },
+                { highlightNodes: [newHeadVal, tailVal, headVal], highlightArrows: [`prev-${newHeadVal}`], fadeNode: headVal },
+                { action: function() { list.deleteHead(); }, fadeNode: headVal }
+            ]);
+        }
+
+        function deleteTailBtn() {
+            if (!list.head) { alert('链表为空'); return; }
+
+            if (list.size === 1) {
+                list.deleteTail();
+                updateInfo();
+                draw();
+                return;
+            }
+
+            const tailVal = list.tail.value;
+            const headVal = list.head.value;
+            const newTailVal = list.tail.prev.value;
+            runAnimation([
+                `① 定位尾节点 "${tailVal}"`,
+                `② newTail.next = head`,
+                `③ head.prev = newTail(${newTailVal})`,
+                `④ 移除旧尾节点`
+            ], [
+                { highlightNodes: [tailVal] },
+                { highlightNodes: [newTailVal, headVal, tailVal], highlightArrows: [`next-${newTailVal}`], fadeNode: tailVal },
+                { highlightNodes: [headVal, newTailVal, tailVal], highlightArrows: [`prev-${headVal}`], fadeNode: tailVal },
+                { action: function() { list.deleteTail(); }, fadeNode: tailVal }
+            ]);
+        }
+
+        function clearList() {
+            if (list.size === 0) return;
+            if (confirm('确定清空？')) {
+                list.clear();
+                updateInfo();
+                draw();
+            }
+        }
+
+        function loadExample() {
+            list.clear();
+            ['A', 'B', 'C', 'D', 'E'].forEach(function(v) { list.append(v); });
+            updateInfo();
+            draw();
+        }
+
+        // 回车支持
+        document.getElementById('nodeValue').addEventListener('keypress', function(e) { if (e.key === 'Enter') appendNode(); });
+
+        // 初始化
+        loadExample();
+    </script>
+</body>
+</html>

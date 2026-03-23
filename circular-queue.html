@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>循环队列可视化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .back-link { display: inline-block; margin-bottom: 15px; color: #00d9ff; text-decoration: none; }
+        .back-link:hover { color: #00ff88; }
+        
+        /* 控制面板 */
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+        
+        .control-group label {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        
+        input[type="text"], input[type="number"] {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 0.9rem;
+            width: 80px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #00d9ff;
+            box-shadow: 0 0 10px rgba(0, 217, 255, 0.3);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            color: #1a1a2e;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.danger {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        }
+        
+        button.warning {
+            background: linear-gradient(135deg, #ffd93d, #ff9f43);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* 信息面板 */
+        .info-panel {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px 20px;
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .info-box h3 {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        
+        .info-box .value {
+            font-size: 1.1rem;
+            color: #00d9ff;
+            font-family: 'Consolas', monospace;
+        }
+        
+        /* Canvas 容器 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        canvas {
+            display: block;
+            border-radius: 8px;
+            margin: 0 auto;
+        }
+        
+        /* 图例 */
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .legend-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+        
+        .legend-circle.front {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.2);
+        }
+        
+        .legend-circle.rear {
+            border-color: #ffd93d;
+            background: rgba(255, 217, 61, 0.2);
+        }
+        
+        .legend-circle.empty {
+            border-color: #555;
+            background: rgba(85, 85, 85, 0.2);
+        }
+        
+        .legend-circle.filled {
+            border-color: #00d9ff;
+            background: rgba(0, 217, 255, 0.3);
+        }
+        
+        /* 操作说明 */
+        .help-section {
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .help-section h3 {
+            color: #00d9ff;
+            margin-bottom: 15px;
+        }
+        
+        .help-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .help-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 3px solid #00d9ff;
+        }
+        
+        .help-item strong {
+            color: #00ff88;
+        }
+        
+        /* 状态提示 */
+        .status-message {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        
+        .status-message.success {
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+        
+        .status-message.error {
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .control-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                flex-wrap: wrap;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+            <a href="index.html" class="back-link">← 返回目录</a>
+        <h1>🔄 循环队列可视化</h1>
+        <p class="subtitle">Circular Queue Visualization - 交互式数据结构演示</p>
+        
+        <!-- 状态提示 -->
+        <div class="status-message" id="statusMessage"></div>
+        
+        <!-- 控制面板 -->
+        <div class="control-panel">
+            <div class="control-group">
+                <label>队列容量:</label>
+                <input type="number" id="queueCapacity" value="8" min="2" max="12">
+                <button onclick="initQueue()">初始化队列</button>
+            </div>
+            
+            <div class="control-group">
+                <label>入队值:</label>
+                <input type="text" id="enqueueValue" placeholder="值">
+                <button onclick="enqueue()">入队 (Enqueue)</button>
+            </div>
+            
+            <div class="control-group">
+                <button onclick="dequeue()" class="warning">出队 (Dequeue)</button>
+                <button onclick="peek()">查看队头</button>
+            </div>
+            
+            <div class="control-group">
+                <button onclick="clearQueue()" class="danger">清空队列</button>
+                <button onclick="loadExample()">加载示例</button>
+            </div>
+        </div>
+        
+        <!-- 信息面板 -->
+        <div class="info-panel">
+            <div class="info-box">
+                <h3>队列容量</h3>
+                <div class="value" id="capacityInfo">8</div>
+            </div>
+            <div class="info-box">
+                <h3>当前元素数</h3>
+                <div class="value" id="sizeInfo">0</div>
+            </div>
+            <div class="info-box">
+                <h3>队头 (front)</h3>
+                <div class="value" id="frontInfo">-1</div>
+            </div>
+            <div class="info-box">
+                <h3>队尾 (rear)</h3>
+                <div class="value" id="rearInfo">-1</div>
+            </div>
+            <div class="info-box">
+                <h3>队列状态</h3>
+                <div class="value" id="statusInfo">空</div>
+            </div>
+        </div>
+        
+        <!-- Canvas 容器 -->
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-circle front"></div>
+                    <span>队头 (front)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle rear"></div>
+                    <span>队尾 (rear)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle filled"></div>
+                    <span>已占用</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle empty"></div>
+                    <span>空闲</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作说明 -->
+        <div class="help-section">
+            <h3>📖 操作说明</h3>
+            <div class="help-grid">
+                <div class="help-item">
+                    <strong>入队 (Enqueue):</strong> 将元素添加到队尾，如果队列已满则失败
+                </div>
+                <div class="help-item">
+                    <strong>出队 (Dequeue):</strong> 移除并返回队头元素，如果队列为空则失败
+                </div>
+                <div class="help-item">
+                    <strong>循环特性:</strong> 当指针到达数组末尾时，会回到开头（取模运算）
+                </div>
+                <div class="help-item">
+                    <strong>判断条件:</strong> 队空: front == -1 | 队满: (rear + 1) % capacity == front
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 循环队列数据结构 ====================
+        class CircularQueue {
+            constructor(capacity) {
+                this.capacity = capacity;
+                this.data = new Array(capacity).fill(null);
+                this.front = -1;  // 队头指针
+                this.rear = -1;   // 队尾指针
+            }
+
+            // 检查是否为空
+            isEmpty() {
+                return this.front === -1;
+            }
+
+            // 检查是否已满
+            isFull() {
+                if (this.front === -1) return false;
+                return (this.rear + 1) % this.capacity === this.front;
+            }
+
+            // 获取当前元素数量
+            size() {
+                if (this.front === -1) return 0;
+                if (this.rear >= this.front) {
+                    return this.rear - this.front + 1;
+                } else {
+                    return this.capacity - this.front + this.rear + 1;
+                }
+            }
+
+            // 入队
+            enqueue(value) {
+                if (this.isFull()) {
+                    return { success: false, message: '队列已满，无法入队！' };
+                }
+                
+                if (this.front === -1) {
+                    // 第一个元素
+                    this.front = 0;
+                    this.rear = 0;
+                } else {
+                    this.rear = (this.rear + 1) % this.capacity;
+                }
+                
+                this.data[this.rear] = value;
+                return { success: true, message: `元素 "${value}" 已入队` };
+            }
+
+            // 出队
+            dequeue() {
+                if (this.isEmpty()) {
+                    return { success: false, message: '队列为空，无法出队！' };
+                }
+                
+                const value = this.data[this.front];
+                this.data[this.front] = null;
+                
+                if (this.front === this.rear) {
+                    // 只有一个元素
+                    this.front = -1;
+                    this.rear = -1;
+                } else {
+                    this.front = (this.front + 1) % this.capacity;
+                }
+                
+                return { success: true, message: `元素 "${value}" 已出队`, value };
+            }
+
+            // 查看队头
+            peek() {
+                if (this.isEmpty()) {
+                    return { success: false, message: '队列为空！' };
+                }
+                return { success: true, value: this.data[this.front] };
+            }
+
+            // 清空队列
+            clear() {
+                this.data = new Array(this.capacity).fill(null);
+                this.front = -1;
+                this.rear = -1;
+            }
+
+            // 获取队列内容（用于显示）
+            getContent() {
+                const result = [];
+                if (this.isEmpty()) return result;
+                
+                let i = this.front;
+                while (true) {
+                    result.push(this.data[i]);
+                    if (i === this.rear) break;
+                    i = (i + 1) % this.capacity;
+                }
+                return result;
+            }
+        }
+
+        // ==================== 全局变量 ====================
+        let queue = new CircularQueue(8);
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 绘图配置
+        const config = {
+            cellSize: 70,
+            padding: 40,
+            arrowSize: 12
+        };
+
+        // ==================== 绘图函数 ====================
+        function drawArrow(fromX, fromY, toX, toY, color) {
+            const headLength = 10;
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX - headLength * Math.cos(angle), toY - headLength * Math.sin(angle));
+            ctx.stroke();
+
+            // 绘制箭头
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(
+                toX - headLength * Math.cos(angle - Math.PI / 6),
+                toY - headLength * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.lineTo(
+                toX - headLength * Math.cos(angle + Math.PI / 6),
+                toY - headLength * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawCircularArrow(centerX, centerY, radius, startAngle, endAngle, color) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.stroke();
+        }
+
+        function draw() {
+            const capacity = queue.capacity;
+            const { cellSize, padding } = config;
+
+            // 计算圆形布局参数
+            const radius = Math.min(250, 30 + capacity * 20);
+            const centerX = radius + padding + 50;
+            const centerY = radius + padding + 30;
+
+            // 设置canvas尺寸
+            canvas.width = (radius + padding + 50) * 2;
+            canvas.height = (radius + padding + 50) * 2;
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制背景网格
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // 绘制圆形连接线
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0, 217, 255, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 绘制循环箭头（表示循环特性）
+            const arrowAngle = Math.PI * 1.5;
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.arc(centerX, centerY, radius + 15, arrowAngle - 0.3, arrowAngle + 0.3);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 绘制每个格子
+            for (let i = 0; i < capacity; i++) {
+                const angle = (i / capacity) * Math.PI * 2 - Math.PI / 2;
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+
+                const isFront = i === queue.front;
+                const isRear = i === queue.rear;
+                const hasValue = queue.data[i] !== null;
+
+                // 绘制格子背景
+                ctx.beginPath();
+                ctx.arc(x, y, cellSize / 2, 0, Math.PI * 2);
+
+                if (isFront && isRear) {
+                    // 同时是队头和队尾
+                    const gradient = ctx.createLinearGradient(x - cellSize/2, y, x + cellSize/2, y);
+                    gradient.addColorStop(0, 'rgba(0, 255, 136, 0.4)');
+                    gradient.addColorStop(1, 'rgba(255, 217, 61, 0.4)');
+                    ctx.fillStyle = gradient;
+                } else if (isFront) {
+                    ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+                } else if (isRear) {
+                    ctx.fillStyle = 'rgba(255, 217, 61, 0.3)';
+                } else if (hasValue) {
+                    ctx.fillStyle = 'rgba(0, 217, 255, 0.2)';
+                } else {
+                    ctx.fillStyle = 'rgba(85, 85, 85, 0.2)';
+                }
+                ctx.fill();
+
+                // 绘制边框
+                ctx.beginPath();
+                ctx.arc(x, y, cellSize / 2, 0, Math.PI * 2);
+                if (isFront) {
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 3;
+                } else if (isRear) {
+                    ctx.strokeStyle = '#ffd93d';
+                    ctx.lineWidth = 3;
+                } else if (hasValue) {
+                    ctx.strokeStyle = '#00d9ff';
+                    ctx.lineWidth = 2;
+                } else {
+                    ctx.strokeStyle = '#555';
+                    ctx.lineWidth = 1;
+                }
+                ctx.stroke();
+
+                // 绘制索引
+                ctx.fillStyle = '#888';
+                ctx.font = '12px Consolas';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const indexOffset = cellSize / 2 + 15;
+                const indexAngle = (i / capacity) * Math.PI * 2 - Math.PI / 2;
+                const indexX = centerX + (radius + indexOffset) * Math.cos(indexAngle);
+                const indexY = centerY + (radius + indexOffset) * Math.sin(indexAngle);
+                ctx.fillText(`[${i}]`, indexX, indexY);
+
+                // 绘制值
+                if (hasValue) {
+                    ctx.fillStyle = '#00ff88';
+                    ctx.font = 'bold 18px Consolas';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(queue.data[i], x, y);
+                } else {
+                    ctx.fillStyle = '#555';
+                    ctx.font = '14px Consolas';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('null', x, y);
+                }
+            }
+
+            // 绘制队头指针标注
+            if (queue.front !== -1) {
+                const frontAngle = (queue.front / capacity) * Math.PI * 2 - Math.PI / 2;
+                const frontX = centerX + radius * Math.cos(frontAngle);
+                const frontY = centerY + radius * Math.sin(frontAngle);
+                
+                // 指向线
+                const labelRadius = radius + 60;
+                const labelX = centerX + labelRadius * Math.cos(frontAngle);
+                const labelY = centerY + labelRadius * Math.sin(frontAngle);
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.moveTo(labelX, labelY);
+                ctx.lineTo(frontX + (cellSize/2 + 5) * Math.cos(frontAngle), frontY + (cellSize/2 + 5) * Math.sin(frontAngle));
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 标签
+                ctx.fillStyle = '#00ff88';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('front', labelX, labelY);
+            }
+
+            // 绘制队尾指针标注
+            if (queue.rear !== -1) {
+                const rearAngle = (queue.rear / capacity) * Math.PI * 2 - Math.PI / 2;
+                const rearX = centerX + radius * Math.cos(rearAngle);
+                const rearY = centerY + radius * Math.sin(rearAngle);
+                
+                const labelRadius = radius + 85;
+                const labelX = centerX + labelRadius * Math.cos(rearAngle);
+                const labelY = centerY + labelRadius * Math.sin(rearAngle);
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#ffd93d';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.moveTo(labelX, labelY);
+                ctx.lineTo(rearX + (cellSize/2 + 5) * Math.cos(rearAngle), rearY + (cellSize/2 + 5) * Math.sin(rearAngle));
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = '#ffd93d';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('rear', labelX, labelY);
+            }
+
+            // 绘制中心信息
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('循环队列', centerX, centerY - 15);
+            ctx.font = '14px Consolas';
+            ctx.fillStyle = '#00d9ff';
+            ctx.fillText(`容量: ${capacity}`, centerX, centerY + 10);
+            ctx.fillStyle = queue.isFull() ? '#ff6b6b' : '#00ff88';
+            ctx.fillText(`大小: ${queue.size()}`, centerX, centerY + 35);
+        }
+
+        // ==================== 辅助函数 ====================
+        function showStatus(message, isSuccess) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = 'status-message ' + (isSuccess ? 'success' : 'error');
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 3000);
+        }
+
+        function updateInfo() {
+            document.getElementById('capacityInfo').textContent = queue.capacity;
+            document.getElementById('sizeInfo').textContent = queue.size();
+            document.getElementById('frontInfo').textContent = queue.front;
+            document.getElementById('rearInfo').textContent = queue.rear;
+            
+            let status = '空';
+            if (queue.isFull()) {
+                status = '已满';
+            } else if (!queue.isEmpty()) {
+                status = '非空';
+            }
+            document.getElementById('statusInfo').textContent = status;
+        }
+
+        // ==================== 操作函数 ====================
+        function initQueue() {
+            const capacity = parseInt(document.getElementById('queueCapacity').value);
+            if (capacity < 2 || capacity > 12) {
+                showStatus('容量必须在 2-12 之间！', false);
+                return;
+            }
+            queue = new CircularQueue(capacity);
+            updateInfo();
+            draw();
+            showStatus(`队列已初始化，容量为 ${capacity}`, true);
+        }
+
+        function enqueue() {
+            const value = document.getElementById('enqueueValue').value.trim();
+            if (value === '') {
+                showStatus('请输入要入队的值！', false);
+                return;
+            }
+            
+            const result = queue.enqueue(value);
+            if (result.success) {
+                document.getElementById('enqueueValue').value = '';
+                updateInfo();
+                draw();
+            }
+            showStatus(result.message, result.success);
+        }
+
+        function dequeue() {
+            const result = queue.dequeue();
+            if (result.success) {
+                updateInfo();
+                draw();
+            }
+            showStatus(result.message, result.success);
+        }
+
+        function peek() {
+            const result = queue.peek();
+            if (result.success) {
+                showStatus(`队头元素: "${result.value}"`, true);
+            } else {
+                showStatus(result.message, false);
+            }
+        }
+
+        function clearQueue() {
+            if (queue.isEmpty()) {
+                showStatus('队列已经是空的！', false);
+                return;
+            }
+            if (confirm('确定要清空队列吗？')) {
+                queue.clear();
+                updateInfo();
+                draw();
+                showStatus('队列已清空', true);
+            }
+        }
+
+        function loadExample() {
+            queue = new CircularQueue(8);
+            queue.enqueue('A');
+            queue.enqueue('B');
+            queue.enqueue('C');
+            queue.enqueue('D');
+            document.getElementById('queueCapacity').value = 8;
+            updateInfo();
+            draw();
+            showStatus('已加载示例数据: A, B, C, D', true);
+        }
+
+        // ==================== 初始化 ====================
+        // 回车键支持
+        document.getElementById('enqueueValue').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') enqueue();
+        });
+
+        document.getElementById('queueCapacity').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') initQueue();
+        });
+
+        // 初始绘制
+        updateInfo();
+        draw();
+    </script>
+</body>
+</html>
