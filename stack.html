@@ -269,28 +269,42 @@
         }
 
         function drawPointer() {
-            const size = 14;
+            const size = 16;
             const x = pointer.x;
             const y = pointer.y;
             
-            // 指针三角形
-            ctx.fillStyle = '#00ff88';
+            // 外发光
             ctx.shadowColor = '#00ff88';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#00ff88';
             ctx.beginPath();
             ctx.moveTo(x, y - size/2);
             ctx.lineTo(x + size, y);
             ctx.lineTo(x, y + size/2);
             ctx.closePath();
             ctx.fill();
+            
+            // 内部高亮
             ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.beginPath();
+            ctx.moveTo(x + 3, y - size/4);
+            ctx.lineTo(x + size - 3, y);
+            ctx.lineTo(x + 3, y + size/4);
+            ctx.closePath();
+            ctx.fill();
             
             // 指针文字
             if (pointer.text) {
-                ctx.font = 'bold 11px Segoe UI';
+                ctx.font = 'bold 12px Segoe UI';
                 ctx.fillStyle = '#00ff88';
                 ctx.textAlign = 'left';
-                ctx.fillText(pointer.text, x + size + 8, y + 4);
+                // 文字背景
+                const textWidth = ctx.measureText(pointer.text).width;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(x + size + 6, y - 10, textWidth + 10, 20);
+                ctx.fillStyle = '#00ff88';
+                ctx.fillText(pointer.text, x + size + 10, y + 5);
             }
         }
 
@@ -333,20 +347,26 @@
             pointer.targetY = targetY;
             pointer.text = text;
             
-            const fromY = pointer.y || targetY;
-            const duration = animationSpeed * 0.6;
+            // 如果指针不可见或第一次，从顶部开始
+            const fromY = (pointer.y === 0) ? 30 : pointer.y;
+            pointer.y = fromY;
+            
+            const duration = animationSpeed * 0.7;
             const startTime = performance.now();
             
             function animate(now) {
                 const elapsed = now - startTime;
                 const progress = Math.min(elapsed / duration, 1);
+                // 弹性缓动效果
                 const ease = 1 - Math.pow(1 - progress, 3);
                 pointer.y = fromY + (targetY - fromY) * ease;
                 draw();
                 if (progress < 1) {
                     requestAnimationFrame(animate);
-                } else if (callback) {
-                    setTimeout(callback, animationSpeed * 0.4);
+                } else {
+                    pointer.y = targetY; // 确保最终位置准确
+                    draw();
+                    if (callback) setTimeout(callback, animationSpeed * 0.3);
                 }
             }
             requestAnimationFrame(animate);
