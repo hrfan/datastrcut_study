@@ -24,13 +24,6 @@
         button.warning { background: linear-gradient(135deg, #ffd93d, #ff9f43); }
         button.info { background: linear-gradient(135deg, #4facfe, #00f2fe); }
         
-        .animation-panel { background: rgba(0,0,0,0.4); border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; border: 1px solid rgba(255, 217, 61, 0.4); display: none; }
-        .animation-panel h3 { color: #ffd93d; margin-bottom: 12px; }
-        .step-list { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; }
-        .step-item { background: rgba(255,255,255,0.05); padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; color: #888; border: 1px solid transparent; }
-        .step-item.active { background: rgba(0, 255, 136, 0.2); color: #00ff88; border-color: #00ff88; }
-        .step-item.done { background: rgba(0, 217, 255, 0.2); color: #00d9ff; border-color: #00d9ff; }
-        
         .info-panel { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
         .info-box { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 16px; flex: 1; min-width: 120px; }
         .info-box h3 { font-size: 0.8rem; color: #888; margin-bottom: 5px; }
@@ -96,11 +89,6 @@
                 <button onclick="clearStack()" class="danger">清空</button>
                 <button onclick="loadExample()">加载示例</button>
             </div>
-        </div>
-        
-        <div class="animation-panel" id="animationPanel">
-            <h3>🎬 操作步骤</h3>
-            <ul class="step-list" id="stepList"></ul>
         </div>
         
         <div class="info-panel">
@@ -170,22 +158,36 @@
         let stack = [];
         let logs = [];
         let animating = false;
+        let currentStep = -1;
+        let steps = [];
+        let animatingElement = null;
+        let animatingType = null;
 
         function resizeCanvas() {
             const container = canvas.parentElement;
-            canvas.width = Math.min(600, container.clientWidth - 40);
+            canvas.width = Math.min(650, container.clientWidth - 40);
             canvas.height = 580;
             draw();
+        }
+
+        function getItemY(index) {
+            const itemHeight = 42;
+            const gap = 8;
+            const startY = 60;
+            return startY + (maxSize - 1 - index) * (itemHeight + gap);
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            const itemWidth = 120;
-            const itemHeight = 45;
+            const itemWidth = 130;
+            const itemHeight = 42;
             const gap = 8;
-            const startX = (canvas.width - itemWidth) / 2;
-            const startY = 30;
+            const startX = (canvas.width - itemWidth) / 2 - 50;
+            const startY = 60;
+            
+            // 绘制操作步骤区域（顶部）
+            drawStepsArea();
             
             // 绘制栈框架
             ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -202,55 +204,27 @@
             ctx.textAlign = 'left';
             ctx.fillText('← BOTTOM', startX + itemWidth + 20, startY + (itemHeight + gap) * (maxSize - 1) + itemHeight / 2 + 4);
             
-            if (stack.length === 0) {
+            if (stack.length === 0 && !animatingElement) {
                 ctx.font = '16px Segoe UI';
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
                 ctx.textAlign = 'center';
-                ctx.fillText('栈为空', canvas.width / 2, canvas.height / 2);
+                ctx.fillText('栈为空', startX + itemWidth / 2, startY + (itemHeight + gap) * maxSize / 2);
                 ctx.font = '12px Segoe UI';
-                ctx.fillText('输入值后点击"入栈"添加元素', canvas.width / 2, canvas.height / 2 + 25);
+                ctx.fillText('输入值后点击"入栈"添加元素', startX + itemWidth / 2, startY + (itemHeight + gap) * maxSize / 2 + 25);
                 return;
             }
             
             // 绘制栈元素（从底部开始）
             for (let i = maxSize - 1; i >= 0; i--) {
-                const y = startY + (maxSize - 1 - i) * (itemHeight + gap);
+                const y = getItemY(i);
                 const stackIndex = i;
                 
                 if (stackIndex < stack.length) {
                     // 有元素
                     const isTop = (stackIndex === stack.length - 1);
-                    const gradient = ctx.createLinearGradient(startX, y, startX + itemWidth, y);
-                    gradient.addColorStop(0, '#f2994a');
-                    gradient.addColorStop(1, '#f2c94c');
+                    const isHighlight = (currentStep >= 0 && steps[currentStep] && steps[currentStep].highlight === stackIndex);
                     
-                    ctx.fillStyle = gradient;
-                    ctx.beginPath();
-                    ctx.roundRect(startX, y, itemWidth, itemHeight, 8);
-                    ctx.fill();
-                    
-                    // 栈顶高亮边框
-                    if (isTop) {
-                        ctx.strokeStyle = '#fff';
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
-                        ctx.shadowColor = 'rgba(255,255,255,0.5)';
-                        ctx.shadowBlur = 10;
-                        ctx.stroke();
-                        ctx.shadowBlur = 0;
-                    }
-                    
-                    // 文字
-                    ctx.font = 'bold 14px Consolas';
-                    ctx.fillStyle = '#1a1a2e';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(stack[stackIndex], startX + itemWidth / 2, y + itemHeight / 2 + 5);
-                    
-                    // 索引
-                    ctx.font = '10px Segoe UI';
-                    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                    ctx.textAlign = 'right';
-                    ctx.fillText('#' + stackIndex, startX - 5, y + itemHeight / 2 + 3);
+                    drawStackItem(startX, y, itemWidth, itemHeight, stack[stackIndex], stackIndex, isTop, isHighlight);
                 } else {
                     // 空位
                     ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -260,6 +234,102 @@
                     ctx.setLineDash([]);
                 }
             }
+            
+            // 绘制动画元素
+            if (animatingElement !== null) {
+                const targetY = getItemY(animatingElement.targetIndex);
+                drawStackItem(startX, animatingElement.y, itemWidth, itemHeight, animatingElement.value, animatingElement.targetIndex, true, true);
+            }
+        }
+
+        function drawStepsArea() {
+            // 步骤显示区域背景
+            const stepsBgY = 5;
+            const stepsBgHeight = 50;
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.roundRect(10, stepsBgY, canvas.width - 20, stepsBgHeight, 8);
+            ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(242, 153, 74, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            if (steps.length === 0) {
+                ctx.font = '14px Segoe UI';
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.textAlign = 'center';
+                ctx.fillText('🎬 操作步骤将在此显示', canvas.width / 2, stepsBgY + 30);
+            } else {
+                // 显示当前步骤
+                const stepWidth = (canvas.width - 40) / steps.length;
+                steps.forEach((step, i) => {
+                    const x = 20 + i * stepWidth;
+                    const isActive = i === currentStep;
+                    const isDone = i < currentStep;
+                    
+                    // 步骤背景
+                    if (isDone) {
+                        ctx.fillStyle = 'rgba(0, 217, 255, 0.2)';
+                    } else if (isActive) {
+                        ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+                    } else {
+                        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                    }
+                    ctx.beginPath();
+                    ctx.roundRect(x, stepsBgY + 8, stepWidth - 5, 34, 6);
+                    ctx.fill();
+                    
+                    // 步骤边框
+                    if (isActive) {
+                        ctx.strokeStyle = '#00ff88';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                    
+                    // 步骤文字
+                    ctx.font = '11px Segoe UI';
+                    ctx.fillStyle = isDone ? '#00d9ff' : (isActive ? '#00ff88' : 'rgba(255,255,255,0.5)');
+                    ctx.textAlign = 'center';
+                    ctx.fillText(step.text, x + (stepWidth - 5) / 2, stepsBgY + 30);
+                });
+            }
+        }
+
+        function drawStackItem(x, y, width, height, value, index, isTop, isHighlight) {
+            // 元素背景
+            const gradient = ctx.createLinearGradient(x, y, x + width, y);
+            gradient.addColorStop(0, isHighlight ? '#00ff88' : '#f2994a');
+            gradient.addColorStop(1, isHighlight ? '#00d9ff' : '#f2c94c');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(x, y, width, height, 8);
+            ctx.fill();
+            
+            // 栈顶或高亮边框
+            if (isTop || isHighlight) {
+                ctx.strokeStyle = isHighlight ? '#fff' : '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowColor = isHighlight ? 'rgba(0,255,136,0.8)' : 'rgba(255,255,255,0.5)';
+                ctx.shadowBlur = isHighlight ? 15 : 10;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+            
+            // 文字
+            ctx.font = 'bold 14px Consolas';
+            ctx.fillStyle = '#1a1a2e';
+            ctx.textAlign = 'center';
+            ctx.fillText(value, x + width / 2, y + height / 2 + 5);
+            
+            // 索引
+            ctx.font = '10px Segoe UI';
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.textAlign = 'right';
+            ctx.fillText('#' + index, x - 5, y + height / 2 + 3);
         }
 
         function updateInfo() {
@@ -287,27 +357,119 @@
             `).join('');
         }
 
-        function showSteps(steps, callback) {
-            const panel = document.getElementById('animationPanel');
-            const list = document.getElementById('stepList');
-            panel.style.display = 'block';
-            list.innerHTML = steps.map(s => `<li class="step-item">${s}</li>`).join('');
+        function animatePush(value, callback) {
+            const itemWidth = 130;
+            const startX = (canvas.width - itemWidth) / 2 - 50;
+            const targetIndex = stack.length;
+            const targetY = getItemY(targetIndex);
+            const startY = -50;
+            
+            animatingElement = {
+                value: value,
+                y: startY,
+                targetIndex: targetIndex
+            };
+            
+            const duration = 400;
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // 使用 easeOutBack 缓动
+                const easeOutBack = (x) => {
+                    const c1 = 1.70158;
+                    const c3 = c1 + 1;
+                    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+                };
+                
+                animatingElement.y = startY + (targetY - startY) * easeOutBack(progress);
+                draw();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    animatingElement = null;
+                    stack.push(value);
+                    draw();
+                    if (callback) callback();
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        function animatePop(callback) {
+            if (stack.length === 0) {
+                if (callback) callback();
+                return;
+            }
+            
+            const itemWidth = 130;
+            const startX = (canvas.width - itemWidth) / 2 - 50;
+            const value = stack[stack.length - 1];
+            const targetIndex = stack.length - 1;
+            const startY = getItemY(targetIndex);
+            const endY = -50;
+            
+            animatingElement = {
+                value: value,
+                y: startY,
+                targetIndex: targetIndex
+            };
+            
+            // 先从栈中移除
+            stack.pop();
+            
+            const duration = 350;
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // 使用 easeInBack 缓动
+                const easeInBack = (x) => {
+                    const c1 = 1.70158;
+                    const c3 = c1 + 1;
+                    return c3 * x * x * x - c1 * x * x;
+                };
+                
+                animatingElement.y = startY + (endY - startY) * easeInBack(progress);
+                draw();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    animatingElement = null;
+                    draw();
+                    if (callback) callback(value);
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        function runSteps(stepList, actionCallback) {
+            steps = stepList.map(s => typeof s === 'string' ? { text: s, highlight: -1 } : s);
+            currentStep = -1;
             
             let i = 0;
             const interval = setInterval(() => {
-                const items = list.querySelectorAll('.step-item');
-                if (i > 0) items[i - 1].classList.add('done');
-                if (i < items.length) {
-                    items[i].classList.add('active');
+                if (i > 0 && steps[i-1]) steps[i-1].done = true;
+                if (i < steps.length) {
+                    currentStep = i;
+                    draw();
                     i++;
                 } else {
                     clearInterval(interval);
+                    // 执行实际操作
                     setTimeout(() => {
-                        panel.style.display = 'none';
-                        if (callback) callback();
-                    }, 500);
+                        actionCallback();
+                    }, 200);
                 }
-            }, 400);
+            }, 300);
         }
 
         function push() {
@@ -322,28 +484,42 @@
             }
             
             animating = true;
-            const steps = ['检查栈是否已满', `准备入栈元素: "${val}"`, '将元素压入栈顶', '更新栈顶指针'];
-            showSteps(steps, () => {
-                stack.push(val);
-                input.value = '';
-                draw();
-                updateInfo();
-                addLog('push', val);
-                animating = false;
+            runSteps([
+                { text: '① 检查栈容量', highlight: -1 },
+                { text: '② 准备入栈', highlight: stack.length },
+                { text: '③ 元素入栈中...', highlight: stack.length }
+            ], () => {
+                animatePush(val, () => {
+                    steps = [];
+                    currentStep = -1;
+                    draw();
+                    updateInfo();
+                    addLog('push', val);
+                    animating = false;
+                });
             });
+            
+            input.value = '';
         }
 
         function pop() {
             if (animating || stack.length === 0) return;
             animating = true;
-            const val = stack[stack.length - 1];
-            const steps = ['检查栈是否为空', `获取栈顶元素: "${val}"`, '移除栈顶元素', '更新栈顶指针'];
-            showSteps(steps, () => {
-                stack.pop();
-                draw();
-                updateInfo();
-                addLog('pop', val);
-                animating = false;
+            const topVal = stack[stack.length - 1];
+            
+            runSteps([
+                { text: '① 检查栈非空', highlight: stack.length - 1 },
+                { text: '② 获取栈顶', highlight: stack.length - 1 },
+                { text: '③ 元素出栈中...', highlight: stack.length - 1 }
+            ], () => {
+                animatePop((val) => {
+                    steps = [];
+                    currentStep = -1;
+                    draw();
+                    updateInfo();
+                    addLog('pop', val);
+                    animating = false;
+                });
             });
         }
 
@@ -351,12 +527,28 @@
             if (stack.length === 0) return;
             const val = stack[stack.length - 1];
             addLog('peek', val);
-            alert(`栈顶元素: "${val}"`);
+            
+            // 闪烁动画
+            let flash = 0;
+            const flashInterval = setInterval(() => {
+                flash++;
+                currentStep = flash % 2 === 0 ? 0 : -1;
+                steps = [{ text: '查看栈顶: ' + val, highlight: stack.length - 1 }];
+                draw();
+                if (flash >= 6) {
+                    clearInterval(flashInterval);
+                    steps = [];
+                    currentStep = -1;
+                    draw();
+                }
+            }, 200);
         }
 
         function clearStack() {
             stack = [];
             logs = [];
+            steps = [];
+            currentStep = -1;
             document.getElementById('logList').innerHTML = '<div class="log-item" style="color: #666; text-align: center; border: none; background: none;">暂无操作记录</div>';
             draw();
             updateInfo();
@@ -378,28 +570,57 @@
             let i = 0;
             animating = true;
             
-            const interval = setInterval(() => {
+            function processNext() {
                 if (i >= expr.length) {
-                    clearInterval(interval);
                     animating = false;
+                    steps = [];
+                    currentStep = -1;
+                    draw();
                     alert('括号匹配演示完成！所有括号已正确配对');
                     return;
                 }
                 const c = expr[i];
+                
                 if (c === '(') {
-                    stack.push(`括号: ${c}`);
-                    addLog('push', c);
+                    steps = [{ text: `'${c}' 左括号入栈`, highlight: stack.length }];
+                    currentStep = 0;
+                    draw();
+                    setTimeout(() => {
+                        stack.push(`括号: ${c}`);
+                        addLog('push', c);
+                        draw();
+                        updateInfo();
+                        i++;
+                        setTimeout(processNext, 400);
+                    }, 500);
                 } else if (c === ')') {
-                    stack.pop();
-                    addLog('pop', ')');
+                    steps = [{ text: `'${c}' 右括号匹配出栈`, highlight: stack.length - 1 }];
+                    currentStep = 0;
+                    draw();
+                    setTimeout(() => {
+                        stack.pop();
+                        addLog('pop', ')');
+                        draw();
+                        updateInfo();
+                        i++;
+                        setTimeout(processNext, 400);
+                    }, 500);
                 } else {
-                    stack.push(c);
-                    addLog('push', c);
+                    steps = [{ text: `运算符 '${c}' 入栈`, highlight: stack.length }];
+                    currentStep = 0;
+                    draw();
+                    setTimeout(() => {
+                        stack.push(c);
+                        addLog('push', c);
+                        draw();
+                        updateInfo();
+                        i++;
+                        setTimeout(processNext, 300);
+                    }, 400);
                 }
-                draw();
-                updateInfo();
-                i++;
-            }, 600);
+            }
+            
+            processNext();
         }
 
         function scenarioUndo() {
@@ -409,32 +630,48 @@
             let i = 0;
             animating = true;
             
-            const interval = setInterval(() => {
+            function doAction() {
                 if (i >= actions.length) {
-                    clearInterval(interval);
-                    // 开始撤销
-                    setTimeout(() => {
-                        const undoInterval = setInterval(() => {
-                            if (stack.length === 0) {
-                                clearInterval(undoInterval);
-                                animating = false;
-                                alert('撤销演示完成！');
-                                return;
-                            }
-                            const v = stack.pop();
-                            addLog('pop', v);
-                            draw();
-                            updateInfo();
-                        }, 800);
-                    }, 500);
+                    setTimeout(startUndo, 500);
                     return;
                 }
-                stack.push(actions[i]);
-                addLog('push', actions[i]);
+                steps = [{ text: actions[i], highlight: stack.length }];
+                currentStep = 0;
                 draw();
-                updateInfo();
-                i++;
-            }, 600);
+                
+                setTimeout(() => {
+                    stack.push(actions[i]);
+                    addLog('push', actions[i]);
+                    draw();
+                    updateInfo();
+                    i++;
+                    setTimeout(doAction, 500);
+                }, 400);
+            }
+            
+            function startUndo() {
+                if (stack.length === 0) {
+                    animating = false;
+                    steps = [];
+                    currentStep = -1;
+                    draw();
+                    alert('撤销演示完成！');
+                    return;
+                }
+                steps = [{ text: '撤销操作...', highlight: stack.length - 1 }];
+                currentStep = 0;
+                draw();
+                
+                setTimeout(() => {
+                    const v = stack.pop();
+                    addLog('pop', v);
+                    draw();
+                    updateInfo();
+                    setTimeout(startUndo, 600);
+                }, 400);
+            }
+            
+            doAction();
         }
 
         function scenarioBrowser() {
@@ -444,69 +681,105 @@
             let i = 0;
             animating = true;
             
-            const interval = setInterval(() => {
+            function browse() {
                 if (i >= pages.length) {
-                    clearInterval(interval);
-                    alert('页面浏览完成！点击确定后模拟返回');
-                    setTimeout(() => {
-                        const backInterval = setInterval(() => {
-                            if (stack.length === 0) {
-                                clearInterval(backInterval);
-                                animating = false;
-                                alert('已返回到首页！');
-                                return;
-                            }
-                            const v = stack.pop();
-                            addLog('pop', `返回: ${v}`);
-                            draw();
-                            updateInfo();
-                        }, 700);
-                    }, 500);
+                    setTimeout(goBack, 500);
                     return;
                 }
-                stack.push(`📄 ${pages[i]}`);
-                addLog('push', pages[i]);
+                steps = [{ text: `访问: ${pages[i]}`, highlight: stack.length }];
+                currentStep = 0;
                 draw();
-                updateInfo();
-                i++;
-            }, 500);
+                
+                setTimeout(() => {
+                    stack.push(`📄 ${pages[i]}`);
+                    addLog('push', pages[i]);
+                    draw();
+                    updateInfo();
+                    i++;
+                    setTimeout(browse, 400);
+                }, 350);
+            }
+            
+            function goBack() {
+                if (stack.length === 0) {
+                    animating = false;
+                    steps = [];
+                    currentStep = -1;
+                    draw();
+                    alert('已返回到首页！');
+                    return;
+                }
+                steps = [{ text: '← 返回上一页', highlight: stack.length - 1 }];
+                currentStep = 0;
+                draw();
+                
+                setTimeout(() => {
+                    const v = stack.pop();
+                    addLog('pop', `返回: ${v}`);
+                    draw();
+                    updateInfo();
+                    setTimeout(goBack, 500);
+                }, 400);
+            }
+            
+            browse();
         }
 
         function scenarioFunction() {
             if (animating) return;
             clearStack();
             const calls = [
-                { fn: 'main()', dir: 'in' },
-                { fn: 'init()', dir: 'in' },
-                { fn: 'loadData()', dir: 'in' },
-                { fn: 'parse()', dir: 'in' },
-                { fn: 'parse()', dir: 'out' },
-                { fn: 'loadData()', dir: 'out' },
-                { fn: 'init()', dir: 'out' },
-                { fn: 'main()', dir: 'out' }
+                { fn: 'main()', type: 'call' },
+                { fn: 'init()', type: 'call' },
+                { fn: 'loadData()', type: 'call' },
+                { fn: 'parse()', type: 'call' },
+                { fn: 'parse()', type: 'return' },
+                { fn: 'loadData()', type: 'return' },
+                { fn: 'init()', type: 'return' },
+                { fn: 'main()', type: 'return' }
             ];
             let i = 0;
             animating = true;
             
-            const interval = setInterval(() => {
+            function processCall() {
                 if (i >= calls.length) {
-                    clearInterval(interval);
                     animating = false;
+                    steps = [];
+                    currentStep = -1;
+                    draw();
                     alert('函数调用栈演示完成！');
                     return;
                 }
                 const call = calls[i];
-                if (call.dir === 'in') {
-                    stack.push(call.fn);
-                    addLog('push', `调用: ${call.fn}`);
+                
+                if (call.type === 'call') {
+                    steps = [{ text: `调用: ${call.fn}`, highlight: stack.length }];
+                    currentStep = 0;
+                    draw();
+                    setTimeout(() => {
+                        stack.push(call.fn);
+                        addLog('push', `调用: ${call.fn}`);
+                        draw();
+                        updateInfo();
+                        i++;
+                        setTimeout(processCall, 500);
+                    }, 400);
                 } else {
-                    const v = stack.pop();
-                    addLog('pop', `返回: ${v}`);
+                    steps = [{ text: `返回: ${call.fn}`, highlight: stack.length - 1 }];
+                    currentStep = 0;
+                    draw();
+                    setTimeout(() => {
+                        stack.pop();
+                        addLog('pop', `返回: ${call.fn}`);
+                        draw();
+                        updateInfo();
+                        i++;
+                        setTimeout(processCall, 500);
+                    }, 400);
                 }
-                draw();
-                updateInfo();
-                i++;
-            }, 600);
+            }
+            
+            processCall();
         }
 
         // 回车键入栈
